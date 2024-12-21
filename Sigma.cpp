@@ -3,7 +3,7 @@
 #include <memory>
 extern int indcount;
 extern int lorindcount;
-int Sigma::getType()
+int Sigma::getType() const
 {
     return type;
 }
@@ -115,6 +115,9 @@ void Sigma1d::print()
 }
 size_t Sigma1d::getHash() {
     return type ^ p ^ c;
+}
+bool Sigma1d::operator<(const Sigma1d& other) const {
+    return std::tie(p, c) < std::tie(other.p, other.c);
 }
 Sigma1d::~Sigma1d()
 {
@@ -246,6 +249,9 @@ void Sigma2d::print()
 size_t Sigma2d::getHash() {
     return type ^ p1 ^ p2 ^ c;
 }
+bool Sigma2d::operator<(const Sigma2d& other) const {
+    return std::tie(p1, p2, c) < std::tie(other.p1, other.p2, other.c);
+}
 Sigma2d::~Sigma2d()
 {
 
@@ -375,6 +381,9 @@ void Sigma3d::print()
 }
 size_t Sigma3d::getHash() {
     return type ^ p1 ^ p2 ^ p3 ^ c;
+}
+bool Sigma3d::operator<(const Sigma3d& other) const {
+    return std::tie(p1, p2, p3, c) < std::tie(other.p1, other.p2, other.p3, other.c);
 }
 Sigma3d::~Sigma3d()
 {

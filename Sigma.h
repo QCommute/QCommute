@@ -21,7 +21,7 @@ public:
     //Функция вывода объекта на экран. Зануление делает класс Base абстрактным и заставляет каждый его наследник перегружать функцию print
     virtual void print() = 0;
    // virtual bool operator==(Base) = 0;
-    int getType();
+    int getType() const;
     //virtual int getVal()=0;
     //virtual void setVal(int val_)=0;
     virtual size_t getHash() = 0;
@@ -53,6 +53,7 @@ public:
     void setC(int c_);
     void setPoint(int p_);
     size_t getHash() override;
+    bool operator<(const Sigma1d& other) const;
     ~Sigma1d();
 };
 
@@ -84,6 +85,7 @@ public:
     void setPoint1(int p1_);
     void setPoint2(int p2_);
     size_t getHash() override;
+    bool operator<(const Sigma2d& other) const;
     ~Sigma2d();
 };
 
@@ -111,6 +113,7 @@ public:
     int getPoint1();
     void setPoint(int p1_, int p2_, int p3_);
     size_t getHash() override;
+    bool operator<(const Sigma3d& other) const;
     ~Sigma3d();
 };
 

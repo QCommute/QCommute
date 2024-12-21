@@ -557,78 +557,43 @@ bool Expression::operator==(const Expression &ex1) const
     if (ex1.im!=im){
         return false;
     }
-    std::vector<std::shared_ptr<Sigma>> lst1;
-    std::vector<std::shared_ptr<Sigma>> lst2;
-    for (int i = 0; i < (int)lst.size(); i++){
-        lst1.push_back(ex1.lst[i]);
-        lst2.push_back(lst[i]);
-    }
-    int k=0;
-    while ((int)lst2.size()){
-            if (lst1[0]->getType()==lst2[k]->getType()){
-                auto s1 = std::dynamic_pointer_cast<Sigma1d>(lst1[0]);
-                auto s2 = std::dynamic_pointer_cast<Sigma2d>(lst1[0]);
-                auto s3 = std::dynamic_pointer_cast<Sigma3d>(lst1[0]);
-                auto s11 = std::dynamic_pointer_cast<Sigma1d>(lst2[k]);
-                auto s21 = std::dynamic_pointer_cast<Sigma2d>(lst2[k]);
-                auto s31 = std::dynamic_pointer_cast<Sigma3d>(lst2[k]);
+    std::vector<bool> used2(lst.size(), false);
+    for(int32_t i = 0; i < lst.size(); i++) {
+        for(int32_t k = 0; k <= lst.size(); k++) {
+            if(k == lst.size())
+                return false;
+            if(used2[k])
+                continue;
+            if (lst[i]->getType()==ex1.lst[k]->getType()){
+                auto s1 = std::dynamic_pointer_cast<Sigma1d>(lst[i]);
+                auto s2 = std::dynamic_pointer_cast<Sigma2d>(lst[i]);
+                auto s3 = std::dynamic_pointer_cast<Sigma3d>(lst[i]);
+                auto s11 = std::dynamic_pointer_cast<Sigma1d>(ex1.lst[k]);
+                auto s21 = std::dynamic_pointer_cast<Sigma2d>(ex1.lst[k]);
+                auto s31 = std::dynamic_pointer_cast<Sigma3d>(ex1.lst[k]);
                 if (s1){
                     if (*s11==*s1){
-                        lst2.erase(lst2.begin()+k);
-                        lst1.erase(lst1.begin());
-                        k=0;
-                        continue;
-                    }
-                    else{
-                        k++;
-                        if (k==(int)lst2.size()){
-                            return false;
-                        }
-                        continue;
+                        used2[k] = true;
+                        break;
                     }
                 }
                 if (s2){
                     if (*s21==*s2){
-                        lst2.erase(lst2.begin()+k);
-                        lst1.erase(lst1.begin());
-                        k=0;
-                        continue;
-                    }
-                    else{
-                        k++;
-                        if (k==(int)lst2.size()){
-                            return false;
-                        }
-                        continue;
+                        used2[k] = true;
+                        break;
                     }
                 }
                 if (s3){
                     if (*s31==*s3){
-                        lst2.erase(lst2.begin()+k);
-                        lst1.erase(lst1.begin());
-                        k=0;
-                        continue;
-                    }
-                    else{
-                        k++;
-                        if (k==(int)lst2.size()){
-                            return false;
-                        }
-                        continue;
+                        used2[k] = true;
+                        break;
                     }
                 }
             }
-            else{
-                k++;
-                if (k==(int)lst2.size()){
-                    return false;
-                    }
-                continue;
-            }
+        }
     }
     return true;
 }
-
 
 void Expression::setCoeff(std::vector<std::shared_ptr<Monom>> &r)
 {
