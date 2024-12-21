@@ -127,18 +127,19 @@ for(int32_t t = 0; t < n; t++) {
                 indices[O1[j]] = j;
             } else {
                 int32_t i = it->second;
+                std::vector<bool> goodMonom(O1[j].getPoly().size(), true);
                 for (int l = 0; l < (int)O1[j].getPoly().size();l++) {
                     for (int k= 0; k < (int)O1[i].getPoly().size(); k++) {
                         if (*O1[i].getPoly()[k]==*O1[j].getPoly()[l]){
                             O1[i].getPoly()[k]->Sum(*O1[j].getPoly()[l]);
-                            O1[j].PolyErase(l);
-                            l--;
+                            goodMonom[l] = false;
                             break;
                         }
                     }
                 }
                 for (int l = 0; l < (int)O1[j].getPoly().size(); l++) {
-                    O1[i].PolyAdd(O1[j].getPoly()[l]);
+                    if(goodMonom[l])
+                        O1[i].PolyAdd(O1[j].getPoly()[l]);
                 }
 
                 good[j] = false;
