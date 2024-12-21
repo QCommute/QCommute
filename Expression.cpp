@@ -723,5 +723,9 @@ Expression::~Expression()
 }
 
 size_t ExpressionHasher::operator()(const Expression& expr) const {
-    return expr.lst.size() * 2 + (expr.im ? 1 : 0);
+    size_t res = expr.lst.size() * 2 + (expr.im ? 1 : 0);
+    for(size_t i = 0; i < expr.lst.size(); i++)
+        //res = res * 0x159fa76bc + expr.lst[i]->getHash();
+        res ^= expr.lst[i]->getHash();
+    return res;
 }

@@ -128,18 +128,19 @@ for(int32_t t = 0; t < n; t++) {
             } else {
                 int32_t i = it->second;
                 std::vector<bool> goodMonom(O1[j].getPoly().size(), true);
-                for (int l = 0; l < (int)O1[j].getPoly().size();l++) {
+                const std::vector<std::shared_ptr<Monom>>& added = O1[j].getPoly();
+                for (int l = 0; l < (int)added.size();l++) {
                     for (int k= 0; k < (int)O1[i].getPoly().size(); k++) {
-                        if (*O1[i].getPoly()[k]==*O1[j].getPoly()[l]){
-                            O1[i].getPoly()[k]->Sum(*O1[j].getPoly()[l]);
+                        if (*O1[i].getPoly()[k]==*added[l]){
+                            O1[i].getPoly()[k]->Sum(*added[l]);
                             goodMonom[l] = false;
                             break;
                         }
                     }
                 }
-                for (int l = 0; l < (int)O1[j].getPoly().size(); l++) {
+                for (int l = 0; l < (int)added.size(); l++) {
                     if(goodMonom[l])
-                        O1[i].PolyAdd(O1[j].getPoly()[l]);
+                        O1[i].PolyAdd(added[l]);
                 }
 
                 good[j] = false;

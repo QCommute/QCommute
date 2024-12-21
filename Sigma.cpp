@@ -113,6 +113,9 @@ void Sigma1d::print()
     }
     std::cout << '(' << p << ')';
 }
+size_t Sigma1d::getHash() {
+    return type ^ p ^ c;
+}
 Sigma1d::~Sigma1d()
 {
 
@@ -240,6 +243,9 @@ void Sigma2d::print()
     }
     std::cout << '(' << p1 << ',' << p2 << ')';
 }
+size_t Sigma2d::getHash() {
+    return type ^ p1 ^ p2 ^ c;
+}
 Sigma2d::~Sigma2d()
 {
 
@@ -366,6 +372,9 @@ void Sigma3d::print()
         std::cout << 'z';
     }
     std::cout << '(' << p1 << ',' << p2 << ',' << p3 << ')';
+}
+size_t Sigma3d::getHash() {
+    return type ^ p1 ^ p2 ^ p3 ^ c;
 }
 Sigma3d::~Sigma3d()
 {
