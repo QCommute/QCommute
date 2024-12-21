@@ -44,9 +44,9 @@ int raiseToPow(int x, int power)
 
 
 int
-main()
+main(int argc, char** argv)
 {
-    directoryPath="/media/ilya/c4043e5e-4ae0-424b-830a-a3b7be6fcbe7/Comm_data/"; //место где хранится файлы с коммутаторами
+    directoryPath="./tmp"; //место где хранится файлы с коммутаторами
     //std::cout << sizeof(Sigma2d)<< std::endl;
     auto start_time = Clock::now();//просто часы чтобы мерить время исполнения
     setlocale(LC_ALL, "");
@@ -54,7 +54,7 @@ main()
     std::vector <Expression> O;//Переменная Наблюдаемой
     std::vector <Expression> O1;
     std::vector <int> I;
-    std::ifstream file("Comm.txt", std::ifstream::in);//огткрфваем файл в котором содерижится наблюдаемая и гамильтониан
+    std::ifstream file(argv[1], std::ifstream::in);//огткрфваем файл в котором содерижится наблюдаемая и гамильтониан
     std::string str;
     std::getline(file, str);
     if (str=="H:"){
@@ -219,7 +219,7 @@ else{
 
 auto time1 = Clock::now();
 std::cout << "Вычисление заняло "<< (std::chrono::duration_cast<std::chrono::microseconds>(time1 - start_time).count())/1000000.0 << " сек" << std::endl;
-    getc(stdin);
-    getc(stdin);
+//    getc(stdin);
+//    getc(stdin);
         return 0;
 }
