@@ -549,7 +549,7 @@ void Expression::MakeMbr(mpz_t mbr_x, mpz_t mbr_y, mpz_t mbr_z, uint8_t Mp)//Ñ„Ñ
 }
 
 
-bool Expression::operator==(const Expression &ex1)
+bool Expression::operator==(const Expression &ex1) const
 {
     if ((int)ex1.lst.size()!=(int)lst.size()){
         return false;
@@ -720,4 +720,8 @@ Expression::~Expression()
    // for (int i = 0; i < (int)poly.size(); i++) {
     //    delete poly[i];
     //}
+}
+
+size_t ExpressionHasher::operator()(const Expression& expr) const {
+    return expr.lst.size() * 2 + (expr.im ? 1 : 0);
 }

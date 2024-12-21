@@ -19,8 +19,8 @@ class Monom;
 
 //Класс для выражения. Возможно основной класс в программе
 
-class Expression
-{
+class Expression {
+    friend struct ExpressionHasher;
 private:
     //коэффициент
     std::vector<std::shared_ptr<Monom>> poly;
@@ -37,7 +37,7 @@ public:
     Expression(const Expression &ex1);
     void Commute(std::vector <Expression> &O1,  const Expression &O);
     Expression& operator=(const Expression &ex1);
-    bool operator==(const Expression &ex1);
+    bool operator==(const Expression &ex1) const;
     int getLength() const;
     void PolyErase(int i);
     uint8_t TotalLength();
@@ -49,4 +49,8 @@ public:
     void setCoeff(std::vector<std::shared_ptr<Monom>> &r);
     void print();
     ~Expression();
+};
+
+struct ExpressionHasher {
+    size_t operator()(const Expression& expr) const;
 };

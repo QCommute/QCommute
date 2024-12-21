@@ -1,3 +1,4 @@
+#include <cstdint>
 #include <vector>
 #include <chrono>
 #include <fstream>
@@ -22,6 +23,7 @@
 #include <gmpxx.h>
 #include <filesystem>
 //#include <ginac/ginac.h>
+#include <unordered_map>
 int indcount;
 int lorindcount;
 std::string directoryPath;
@@ -89,18 +91,17 @@ main(int argc, char** argv)
         n+=(str[i]-'0')*raiseToPow(10,(int)str.length()-i-1);//порядок разложения (сколько вложенных коммутаторов нужно посчитать)
     }
     file.close();
-    int Nn=n;
-std::cout << "Файл считан корректно"<< std::endl;
-int nummm=0;
+    std::cout << "Файл считан корректно"<< std::endl;
+
 //#pragma omp parallel for schedule(dynamic)
 //#pragma omp parallel for schedule(dynamic)
-while(n!=0){
-    directoryPath+=std::to_string(Nn-n+1);
+for(int32_t t = 0; t < n; t++) {
+    directoryPath+=std::to_string(t + 1);
     if (!std::filesystem::exists(directoryPath)) {
         std::filesystem::create_directory(directoryPath);
-        std::cout << "Создана директория: " << Nn-n+1 << std::endl;
+        std::cout << "Создана директория: " << t + 1 << std::endl;
     } 
-    if ((int)O.size()!=0){
+
         auto time2 = Clock::now();
         for (int i = 0; i < (int)H.size(); i++) {
             #pragma omp parallel for schedule(dynamic)
@@ -109,7 +110,7 @@ while(n!=0){
             }
         }
         auto time3 = Clock::now();
-        std::cout << n << "этап "<< (std::chrono::duration_cast<std::chrono::microseconds>(time3 - time2).count())/1000000.0 << " сек" << std::endl;
+        std::cout << t + 1 << "этап "<< (std::chrono::duration_cast<std::chrono::microseconds>(time3 - time2).count())/1000000.0 << " сек" << std::endl;
         //if (n==1){
         //        n=1;
         //for (int i= 0; i < (int)O1.size(); i++) {
@@ -118,26 +119,35 @@ while(n!=0){
 //}
 
 //тут и дальше приведение подобных, сделано пока очень топорно, это самое узкое место
-        for (int i = 0; i < (int)O1.size(); i++) {
-            for (int j = i+1; j < (int)O1.size(); j++) {
-                 if (O1[i]==O1[j]){
-                    for (int l = 0; l < (int)O1[j].getPoly().size();l++) {
-                        for (int k= 0; k < (int)O1[i].getPoly().size(); k++) {
-                            if (*O1[i].getPoly()[k]==*O1[j].getPoly()[l]){
-                                O1[i].getPoly()[k]->Sum(*O1[j].getPoly()[l]);
-                                O1[j].PolyErase(l);
-                                l--;
-                                break;
-                            }
+        std::unordered_map<Expression, int32_t, ExpressionHasher> indices;
+        std::vector<bool> good(O1.size(), true);
+        for(int32_t j = 0; j < (int32_t)O1.size(); j++) {
+            auto it = indices.find(O1[j]);
+            if(it == indices.end()) {
+                indices[O1[j]] = j;
+            } else {
+                int32_t i = it->second;
+                for (int l = 0; l < (int)O1[j].getPoly().size();l++) {
+                    for (int k= 0; k < (int)O1[i].getPoly().size(); k++) {
+                        if (*O1[i].getPoly()[k]==*O1[j].getPoly()[l]){
+                            O1[i].getPoly()[k]->Sum(*O1[j].getPoly()[l]);
+                            O1[j].PolyErase(l);
+                            l--;
+                            break;
                         }
                     }
-                    for (int l = 0; l < (int)O1[j].getPoly().size(); l++) {
-                        O1[i].PolyAdd(O1[j].getPoly()[l]);
-                    }
-                    O1.erase(O1.begin()+j);
-                    j--;
-                 }
+                }
+                for (int l = 0; l < (int)O1[j].getPoly().size(); l++) {
+                    O1[i].PolyAdd(O1[j].getPoly()[l]);
+                }
+
+                good[j] = false;
             }
+        }
+    
+        for (int i = 0; i < (int)O1.size(); i++) {
+            if(!good[i])
+                continue;
             bool b=false;
             for (int k= 0; k < (int)O1[i].getPoly().size(); k++) {
                 if (O1[i].getPoly()[k]->isZero()==false){
@@ -145,65 +155,16 @@ while(n!=0){
                     break;
                 }
             }
-            if (b==false){
-                O1.erase(O1.begin()+i);
-                i--;
-            }
+            good[i] = good[i] && b;
         }
+    
         O.clear();
-        n--;
-        directoryPath.erase(directoryPath.size()-1);
-        continue;
-    }
-    //после каждой итерации мы используем наблюдаемые из одного массива, например О и кладем резуцльтат в другой, например О1, тогда на следующей итерации в качестве наблюдаемой берем уже O1 а результат идет в O и т.д. После каждой итерации очищаем предыдущий список наблюдаемых
-    if ((int)O1.size()!=0){ //проверка что это акуальная (не очищенная) наблюдаемая
-        for (int i = 0; i < (int)H.size(); i++) {
-            #pragma omp parallel for schedule(dynamic)
-            for (int j = 0; j < (int)O1.size(); j++) {
-                H[i].Commute(O,O1[j]); //коммутация с гамильтонаном
-            }
-        }
-       // for (int i= 0; i < (int)O.size(); i++) {
-       //     O[i].print();
-       // }
-       //приведение подобных
-        for (int i = 0; i < (int)O.size(); i++) {
-            for (int j = i+1; j < (int)O.size(); j++) {
-                 if (O[i]==O[j]){
-                    for (int l = 0; l < (int)O[j].getPoly().size();l++) {
-                        for (int k= 0; k < (int)O[i].getPoly().size(); k++) {
-                            if (*O[i].getPoly()[k]==*O[j].getPoly()[l]){
-                                O[i].getPoly()[k]->Sum(*O[j].getPoly()[l]);
-                                O[j].PolyErase(l);
-                                l--;
-                                break;
-                            }
-                        }
-                    }
-                    for (int l = 0; l < (int)O[j].getPoly().size(); l++) {
-                        O[i].PolyAdd(O[j].getPoly()[l]);
-                    }
-                    O.erase(O.begin()+j);
-                    j--;
-                 }
-            }
-            bool b=false;
-            for (int k= 0; k < (int)O[i].getPoly().size(); k++) {
-                if (O[i].getPoly()[k]->isZero()==false){
-                    b=true;
-                    break;
-                }
-            }
-            if (b==false){
-                O.erase(O.begin()+i);
-                i--;
-            }
-        }
+        for(int32_t i = 0; i < O1.size(); i++)
+            if(good[i])
+                O.push_back(O1[i]);
         O1.clear();
-        n--;
+    
         directoryPath.erase(directoryPath.size()-1);
-        continue;
-    }
 }
 //вывод результата, пока он делается просто на экран
 if ((int)O.size()!=0){
