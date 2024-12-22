@@ -24,6 +24,7 @@
 #include <filesystem>
 //#include <ginac/ginac.h>
 #include <unordered_map>
+#include <set>
 int indcount;
 int lorindcount;
 std::string directoryPath;
@@ -120,8 +121,10 @@ for(int32_t t = 0; t < n; t++) {
 
 //тут и дальше приведение подобных, сделано пока очень топорно, это самое узкое место
         std::unordered_map<Expression, int32_t, ExpressionHasher> indices;
+        std::set<size_t> hashSet;
         std::vector<bool> good(O1.size(), true);
         for(int32_t j = 0; j < (int32_t)O1.size(); j++) {
+            hashSet.insert(ExpressionHasher()(O1[j]));
             auto it = indices.find(O1[j]);
             if(it == indices.end()) {
                 indices[O1[j]] = j;
@@ -132,6 +135,7 @@ for(int32_t t = 0; t < n; t++) {
                 good[j] = false;
             }
         }
+        //std::cout << "Total " << O1.size() << "; unique " << indices.size() << "; unique hashes " << hashSet.size() << "\n";
     
         for (int i = 0; i < (int)O1.size(); i++) {
             if(!good[i])
