@@ -1,6 +1,15 @@
 #include "Sigma.h"
 #include <cstdlib>
 #include <memory>
+
+// Splitmix64, https://github.com/svaarala/duktape/blob/master/misc/splitmix64.c
+uint64_t splitmix64(int x) {
+    uint64_t z = x + 0x9e3779b97f4a7c15ull;
+    z = (z ^ (z >> 30)) * 0xbf58476d1ce4e5b9ull;
+    z = (z ^ (z >> 27)) * 0x94d049bb133111ebull;
+    return z ^ (z >> 31);
+}
+
 extern int indcount;
 extern int lorindcount;
 int Sigma::getType() const
@@ -114,7 +123,7 @@ void Sigma1d::print()
     std::cout << '(' << p << ')';
 }
 size_t Sigma1d::getHash() {
-    return type ^ p ^ c;
+    return type ^ splitmix64(p) ^ c;
 }
 bool Sigma1d::operator<(const Sigma1d& other) const {
     return std::tie(p, c) < std::tie(other.p, other.c);
@@ -247,7 +256,7 @@ void Sigma2d::print()
     std::cout << '(' << p1 << ',' << p2 << ')';
 }
 size_t Sigma2d::getHash() {
-    return type ^ p1 ^ p2 ^ c;
+    return type ^ splitmix64(p1) ^ splitmix64(p2) ^ c;
 }
 bool Sigma2d::operator<(const Sigma2d& other) const {
     return std::tie(p1, p2, c) < std::tie(other.p1, other.p2, other.c);
@@ -380,7 +389,7 @@ void Sigma3d::print()
     std::cout << '(' << p1 << ',' << p2 << ',' << p3 << ')';
 }
 size_t Sigma3d::getHash() {
-    return type ^ p1 ^ p2 ^ p3 ^ c;
+    return type ^ splitmix64(p1) ^ splitmix64(p2) ^ splitmix64(p3) ^ c;
 }
 bool Sigma3d::operator<(const Sigma3d& other) const {
     return std::tie(p1, p2, p3, c) < std::tie(other.p1, other.p2, other.p3, other.c);
