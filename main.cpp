@@ -97,6 +97,7 @@ main(int argc, char** argv)
 //#pragma omp parallel for schedule(dynamic)
 //#pragma omp parallel for schedule(dynamic)
 for(int32_t t = 0; t < n; t++) {
+    std::cout << "Этап " << t + 1 << std::endl;
     directoryPath+=std::to_string(t + 1);
     if (!std::filesystem::exists(directoryPath)) {
         std::filesystem::create_directory(directoryPath);
@@ -111,20 +112,15 @@ for(int32_t t = 0; t < n; t++) {
             }
         }
         auto time3 = Clock::now();
-        std::cout << t + 1 << "этап "<< (std::chrono::duration_cast<std::chrono::microseconds>(time3 - time2).count())/1000000.0 << " сек" << std::endl;
-        //if (n==1){
-        //        n=1;
-        //for (int i= 0; i < (int)O1.size(); i++) {
-        //    O1[i].print();
-        //}
-//}
+        std::cout << "Подсчет коммутаторов: " << (std::chrono::duration_cast<std::chrono::microseconds>(time3 - time2).count())/1000000.0 << " сек" << std::endl;
 
 //тут и дальше приведение подобных, сделано пока очень топорно, это самое узкое место
+        auto time4 = Clock::now();
         std::unordered_map<Expression, int32_t, ExpressionHasher> indices;
-        std::set<size_t> hashSet;
+        //std::set<size_t> hashSet;
         std::vector<bool> good(O1.size(), true);
         for(int32_t j = 0; j < (int32_t)O1.size(); j++) {
-            hashSet.insert(ExpressionHasher()(O1[j]));
+            //hashSet.insert(ExpressionHasher()(O1[j]));
             auto it = indices.find(O1[j]);
             if(it == indices.end()) {
                 indices[O1[j]] = j;
@@ -150,7 +146,11 @@ for(int32_t t = 0; t < n; t++) {
         O1.clear();
     
         directoryPath.erase(directoryPath.size()-1);
+        auto time5 = Clock::now();
+        std::cout << "Приведение подобных: " << (std::chrono::duration_cast<std::chrono::microseconds>(time5 - time4).count())/1000000.0 << " сек" << std::endl;
+        std::cout << std::endl;
 }
+    
 //вывод результата, пока он делается просто на экран
 if ((int)O.size()!=0){
     for (int i= 0; i < (int)O.size(); i++) {
