@@ -15,7 +15,8 @@ src_files = [
     'main.cpp',
     'Monom.cpp',
     'Expression.cpp',
-    'Sigma.cpp'
+    'Sigma.cpp',
+    'Poly.cpp'
 ]
 executable('main', src_files, dependencies : dependencies)
 

@@ -28,7 +28,7 @@ Expression::Expression(std::string s)
             int tmp;
             std::shared_ptr<Monom> mon(new Monom(s,i,tmp));
             i = tmp;
-            poly.push_back(mon);
+            poly.addMonom(mon);
             if (s[i] == ']'){
                 i++;
             }
@@ -68,7 +68,7 @@ Expression::Expression(std::string s)
 }
 
 //Просто глубокое копирование списка и присваивание коэффициента
-Expression::Expression(const std::vector<std::shared_ptr<Sigma>> &v,  const std::vector<std::shared_ptr<Monom>> &r, bool imm)
+Expression::Expression(const std::vector<std::shared_ptr<Sigma>> &v, const std::vector<std::shared_ptr<Monom>> &r, bool imm)
 {
     im=imm;
     for (int i = 0; i < (int)v.size(); i++) {
@@ -79,7 +79,7 @@ Expression::Expression(const std::vector<std::shared_ptr<Sigma>> &v,  const std:
     for (int i = 0; i < (int)r.size(); i++) {
         std::shared_ptr<Monom> t;
         deepCopyMonom(t, r[i]);
-        poly.push_back(t);
+        poly.addMonom(t);
     }
 }
 //конструктор от выражения
@@ -91,11 +91,7 @@ Expression::Expression(const Expression &ex1)
         deepCopyBase(t, ex1.lst[i]);
         lst.push_back(t);
     }
-    for (int i = 0; i < (int)ex1.poly.size(); i++) {
-        std::shared_ptr<Monom> t;
-        deepCopyMonom(t, ex1.poly[i]);
-        poly.push_back(t);
-    }
+    poly.deepCopyFrom(ex1.poly);
 } 
 //присваивание выражения
 Expression& Expression::operator=(const Expression &ex1)
@@ -105,17 +101,12 @@ im=ex1.im;
     //    delete lst[i];
     //}
     lst.clear();
-    poly.clear();
     for (int i = 0; i < (int)ex1.lst.size(); i++) {
         std::shared_ptr<Sigma> t;
         deepCopyBase(t, ex1.lst[i]);
         lst.push_back(t);
     }
-    for (int i = 0; i < (int)ex1.poly.size(); i++) {
-        std::shared_ptr<Monom> t;
-        deepCopyMonom(t, ex1.poly[i]);
-        poly.push_back(t);
-    }
+    poly.deepCopyFrom(ex1.poly);
     return *this;
 }
 //много вспомогательных функций
@@ -123,18 +114,9 @@ std::vector<std::shared_ptr<Sigma>> Expression::getList() const
 {
     return lst;
 }
-std::vector<std::shared_ptr<Monom>> Expression::getPoly()
+Poly& Expression::getPoly()
 {
     return poly;
-}
-void Expression::PolyErase(int i)
-{
-    poly.erase(poly.begin()+i);
-
-}
-void Expression::PolyAdd(std::shared_ptr<Monom> t)
-{
-    poly.push_back(t);
 }
 int Expression::getLength() const
 {
@@ -143,47 +125,11 @@ int Expression::getLength() const
 //самый главный оператор (коммутатор списка с элементов)
 void Expression::Commute(std::vector <Expression> &O1,  const Expression &O)
 {
-    std::vector<std::shared_ptr<Monom>> pol1;
-    std::vector<std::shared_ptr<Monom>> pol2;
     //работа с полиномами, а именно их умножение
-    for (int i = 0; i < (int)O.poly.size(); i++) {
-        std::shared_ptr<Monom> t;
-        deepCopyMonom(t, O.poly[i]);
-        pol1.push_back(t);
-        pol2.push_back(t);
-    }
-    for (int i = 0; i < (int)pol1.size(); i++) {
-        pol1[i]->Prod(*poly[0]);
-    }
-    for (int i = 1; i < (int)poly.size(); i++) {
-        for (int j = 0; j < (int)pol2.size(); j++) {
-            pol2[j]->Prod(*poly[i]);
-        }
-        for (int j = 0; j < (int)pol2.size(); j++) {
-            for (int k = 0; k < (int)pol1.size(); k++) {
-                if (*pol2[j]==*pol1[k]){
-                    pol1[k]->Sum(*pol2[j]);
-                    pol2.erase(pol2.begin()+j);
-                    j--;
-                    break;
-                }
-            }
-        }
-        for (int j = 0; j < (int)pol2.size(); j++) {
-            pol1.push_back(pol2[j]);
-        }
-        pol2.clear();
-
-        for (int j = 0; j < (int)O.poly.size(); j++) {
-            std::shared_ptr<Monom> t;
-            deepCopyMonom(t, O.poly[j]);
-            pol2.push_back(t);
-        }
-    }
+    std::vector<std::shared_ptr<Monom>> pol1 = (poly * O.poly).getData();
     for (int i = 0; i < (int)pol1.size(); i++) {
         pol1[i]->Prod2(2);
     }
-    pol2.clear();
 
     //отсюда начинается сама коммутация в прицнипе тут осбо модно ничего не комментировать главное то как записывается результат в конце , там будет комментарий
     std::vector<std::shared_ptr<Sigma>> lst1;
@@ -595,18 +541,6 @@ bool Expression::operator==(const Expression &ex1) const
     return true;
 }
 
-void Expression::setCoeff(std::vector<std::shared_ptr<Monom>> &r)
-{
-    poly.clear();
-    for (int i = 0; i < (int)r.size(); i++) {
-        std::shared_ptr<Monom> t;
-        deepCopyMonom(t, r[i]);
-        poly.push_back(t);
-    }
-}
-
-
-
 int LeviChivita(int i, int j){
 if (i==1){
     if (j==2){
@@ -661,14 +595,8 @@ void Expression::print()
     if (im==true){
         std::cout << "i*";
     }
-    std::cout << '[';
-    for (int i = 0; i < (int)poly.size(); i++) {
-        if (i){
-            std::cout << ';';
-        }
-        poly[i]->print();
-    }
-    std::cout << "]*";
+    poly.print();
+    std::cout << '*';
     for (int i = 0; i < (int)lst.size(); i++) {
         lst[i]->print();
 

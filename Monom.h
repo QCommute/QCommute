@@ -10,8 +10,6 @@
 #include <cstdlib>
 #include <memory>
 #include <gmpxx.h>
-#include "Expression.h"
-class Expression;
 
 class Monom
 {

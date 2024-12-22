@@ -127,21 +127,7 @@ for(int32_t t = 0; t < n; t++) {
                 indices[O1[j]] = j;
             } else {
                 int32_t i = it->second;
-                std::vector<bool> goodMonom(O1[j].getPoly().size(), true);
-                const std::vector<std::shared_ptr<Monom>>& added = O1[j].getPoly();
-                for (int l = 0; l < (int)added.size();l++) {
-                    for (int k= 0; k < (int)O1[i].getPoly().size(); k++) {
-                        if (*O1[i].getPoly()[k]==*added[l]){
-                            O1[i].getPoly()[k]->Sum(*added[l]);
-                            goodMonom[l] = false;
-                            break;
-                        }
-                    }
-                }
-                for (int l = 0; l < (int)added.size(); l++) {
-                    if(goodMonom[l])
-                        O1[i].PolyAdd(added[l]);
-                }
+                O1[i].getPoly() += O1[j].getPoly();
 
                 good[j] = false;
             }
@@ -150,14 +136,7 @@ for(int32_t t = 0; t < n; t++) {
         for (int i = 0; i < (int)O1.size(); i++) {
             if(!good[i])
                 continue;
-            bool b=false;
-            for (int k= 0; k < (int)O1[i].getPoly().size(); k++) {
-                if (O1[i].getPoly()[k]->isZero()==false){
-                    b=true;
-                    break;
-                }
-            }
-            good[i] = good[i] && b;
+            good[i] = good[i] && (!O1[i].getPoly().isZero());
         }
     
         O.clear();

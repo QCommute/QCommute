@@ -11,6 +11,7 @@
 #include <memory>
 #include "Sigma.h"
 #include "Monom.h"
+#include "Poly.h"
 int PrimeNumber(int n);
 int LeviChivita(int i, int j);
 bool prime(long int n);
@@ -23,7 +24,8 @@ class Expression {
     friend struct ExpressionHasher;
 private:
     //коэффициент
-    std::vector<std::shared_ptr<Monom>> poly;
+    //std::vector<std::shared_ptr<Monom>> poly;
+    Poly poly;
     //Список сигм
     std::vector<std::shared_ptr<Sigma>> lst;
 
@@ -39,14 +41,11 @@ public:
     Expression& operator=(const Expression &ex1);
     bool operator==(const Expression &ex1) const;
     int getLength() const;
-    void PolyErase(int i);
     uint8_t TotalLength();
     uint8_t MaxPoint();
     void MakeMbr(mpz_t mmbr_x, mpz_t mbr_y, mpz_t mbr_z, uint8_t Mp);
-    void PolyAdd(std::shared_ptr<Monom> t);
     std::vector<std::shared_ptr<Sigma>> getList() const;
-    std::vector<std::shared_ptr<Monom>> getPoly();
-    void setCoeff(std::vector<std::shared_ptr<Monom>> &r);
+    Poly& getPoly();
     void print();
     ~Expression();
 };
