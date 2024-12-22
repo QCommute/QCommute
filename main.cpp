@@ -124,10 +124,16 @@ main(int argc, char** argv)
         auto time3 = Clock::now();
         std::cout << "Подсчет коммутаторов и приведение подобных: " << (std::chrono::duration_cast<std::chrono::microseconds>(time3 - time2).count())/1000000.0 << " сек" << std::endl;
 
-        O.clear();
-        for(int32_t i = 0; i < O1.size(); i++)
-            if(!O1[i].getPoly().isZero())
-                O.push_back(O1[i]);
+        size_t next = 0;
+        for(size_t i = 0; i < O1.size(); i++)
+            if(!O1[i].getPoly().isZero()) {
+                if(i != next)
+                    std::swap(O1[next], O1[i]);
+                next++;
+            }
+        while(O1.size() > next)
+            O1.pop_back();
+        O.swap(O1);
         O1.clear();
     
         directoryPath.erase(directoryPath.size()-1);
