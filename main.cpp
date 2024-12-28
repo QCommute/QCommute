@@ -216,19 +216,11 @@ main(int argc, char** argv)
         delete[] indices;
 
         for(size_t i = 0; i < O1_tmp.size(); i++) {
-            O1.push_back(std::move(O1_tmp[i]->expr));
+            if(!O1_tmp[i]->expr.getPoly().isZero())
+                O1.push_back(std::move(O1_tmp[i]->expr));
             delete O1_tmp[i];
         }
         
-        size_t next = 0;
-        for(size_t i = 0; i < O1.size(); i++)
-            if(!O1[i].getPoly().isZero()) {
-                if(i != next)
-                    std::swap(O1[next], O1[i]);
-                next++;
-            }
-        while(O1.size() > next)
-            O1.pop_back();
         O.swap(O1);
         O1.clear();
     
