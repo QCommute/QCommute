@@ -1,4 +1,5 @@
 #include "Poly.h"
+#include <gmp-x86_64.h>
 
 void Poly::addMonom(std::shared_ptr<Monom> monom) {
     data_.push_back(monom);
@@ -65,4 +66,28 @@ Poly Poly::operator*(const Poly& other) const {
         res += tmp;
     }
     return res;
+}
+
+bool Poly::operator==(const Poly& other) const {
+    if(data_.size() != other.data_.size())
+        return false;
+    std::vector<bool> otherUsed(data_.size(), false);
+    for(size_t i = 0; i < data_.size(); i++) {
+        for(size_t j = 0; j < other.data_.size(); j++)
+            if(!otherUsed[j] && (*data_[i]) == (*other.data_[j])) {
+                mpz_t coef_i, coef_j;
+                mpz_init(coef_i);
+                mpz_init(coef_j);
+                data_[i]->getCoef(coef_i);
+                other.data_[j]->getCoef(coef_j);
+                if(mpz_cmp(coef_i, coef_j) == 0) {
+                    otherUsed[j] = true;
+                    break;
+                }
+            }
+    }
+    for(size_t i = 0; i < data_.size(); i++)
+        if(!otherUsed[i])
+            return false;
+    return true;
 }

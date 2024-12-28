@@ -13,6 +13,10 @@ void Monom::setCoef(mpz_t c_)
 {
     mpz_set(coef,c_);
 }
+void Monom::getCoef(mpz_t& res) const {
+    mpz_set(res, coef);
+}
+
 void Monom::Prod(const Monom &mn)
 {
     mpz_mul(coef,coef,mn.coef);
@@ -45,27 +49,16 @@ Monom::Monom(const std::string &s, int pos, int &npos)
             pos++;
         }
         string nums="";
-        int num=0;
-        int temp=1;
-        int pow=1;
-        int j=0;
-        while ((s[pos+j] >= '0' && s[pos+j] <= '9') || (s[pos] == '-')){
-            nums+=s[pos+j];
-            j++;
+        while ((s[pos] >= '0' && s[pos] <= '9') || (s[pos] == '-')){
+            nums.push_back(s[pos]);
+            pos++;
         }
-        for (int k = pos+j-1; k > pos-1; k--) {
-            temp = s[k] - '0';
-            num+=temp*pow;
-            pow*=10;
-            temp=1;
-        }
+        
         if (mpz_cmp_si(coef, 0)==0 && (int)pows.size()==0){
             mpz_set_str(coef, nums.c_str(), 10);
+        } else {
+            pows.push_back(std::stoi(nums));
         }
-        else{
-            pows.push_back(num);
-        }
-        pos+=j;
     }
     npos = pos;
 }

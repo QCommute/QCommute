@@ -33,6 +33,7 @@ public:
     void Prod2(int n);
     //std::vector<int> getPows() const;
     void setCoef(mpz_t c_);
+    void getCoef(mpz_t& res) const;
    //void setPoint(int p_);
     ~Monom();
 };

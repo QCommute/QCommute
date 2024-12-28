@@ -31,6 +31,7 @@ private:
 
     bool im;
 public:
+    Expression() = default;
     //Конструктор от строки
     Expression(std::string s);
     //Конструктор от списка множителей и коэффициента, который по умолчанию 1
@@ -46,6 +47,7 @@ public:
     void MakeMbr(mpz_t mmbr_x, mpz_t mbr_y, mpz_t mbr_z, uint8_t Mp);
     std::vector<std::shared_ptr<Sigma>> getList() const;
     Poly& getPoly();
+    const Poly& getPoly() const;
     void print();
     ~Expression();
 };

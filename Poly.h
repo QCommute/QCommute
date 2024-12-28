@@ -17,4 +17,6 @@ public:
 
     Poly& operator+=(const Poly& other);
     Poly operator*(const Poly& other) const;
+    // Точное равенство, включая коэффициенты
+    bool operator==(const Poly& other) const;
 };

@@ -31,7 +31,8 @@ Expression::Expression(std::string s)
             poly.addMonom(mon);
             if (s[i] == ']'){
                 i++;
-            }
+            } else
+                i--;
         } else if (s[i] == 'S') {
             int tmp;
             int j=1;
@@ -115,6 +116,10 @@ std::vector<std::shared_ptr<Sigma>> Expression::getList() const
     return lst;
 }
 Poly& Expression::getPoly()
+{
+    return poly;
+}
+const Poly& Expression::getPoly() const
 {
     return poly;
 }
