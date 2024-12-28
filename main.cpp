@@ -26,6 +26,7 @@
 #include <unordered_map>
 #include <set>
 #include <unordered_set>
+#include <queue>
 int indcount;
 int lorindcount;
 std::string directoryPath;
@@ -155,29 +156,52 @@ main(int argc, char** argv)
         Node** indices = new Node*[tableSize];
         for(size_t i = 0; i < tableSize; i++)
             indices[i] = nullptr;
+        std::mutex* indexMutexes = new std::mutex[tableSize];
         for (size_t i = 0; i < H.size(); i++) {
-            for (size_t j = 0; j < O.size(); j++) {
-                std::vector<Expression> cur;
-                H[i].Commute(cur, O[j]); //коммутируем все салгаемые с гамильтонанном.
+            std::queue<size_t> tasks;
+            for (size_t j = 0; j < O.size(); j++)
+                tasks.push(j);
+            std::mutex taskMutex;
 
-                for(size_t k = 0; k < cur.size(); k++) {
-                    size_t hash = ExpressionHasher()(cur[k]);
-                    Node* cur_node = indices[hash % tableSize];
-                    bool found = false;
-                    while(cur_node != nullptr) {
-                        if(cur_node->expr == cur[k]) {
-                            cur_node->expr.getPoly() += cur[k].getPoly();
-                            found = true;
-                            break;
+            std::vector<std::thread> threads;
+            size_t num_threads = std::thread::hardware_concurrency();
+            for(size_t tt = 0; tt < num_threads; tt++) {
+                threads.emplace_back([&tasks, &taskMutex, indices, tableSize, indexMutexes, &O, &H, i]() {
+                    while(true) {
+                        std::unique_lock<std::mutex> lock(taskMutex);
+                        if(tasks.empty())
+                            return;
+                        size_t j = tasks.front();
+                        tasks.pop();
+                        lock.unlock();
+                        
+                        std::vector<Expression> cur;
+                        H[i].Commute(cur, O[j]); //коммутируем все салгаемые с гамильтонанном.
+                        
+                        for(size_t k = 0; k < cur.size(); k++) {
+                            size_t hash = ExpressionHasher()(cur[k]);
+                            std::lock_guard<std::mutex> guard(indexMutexes[hash % tableSize]);
+                            Node* cur_node = indices[hash % tableSize];
+                            bool found = false;
+                            while(cur_node != nullptr) {
+                                if(cur_node->expr == cur[k]) {
+                                    cur_node->expr.getPoly() += cur[k].getPoly();
+                                    found = true;
+                                    break;
+                                }
+                                cur_node = cur_node->next;
+                            }
+                            if(!found) {
+                                indices[hash % tableSize] = new Node(std::move(cur[k]), indices[hash % tableSize]);
+                            }
                         }
-                        cur_node = cur_node->next;
                     }
-                    if(!found) {
-                        indices[hash % tableSize] = new Node(std::move(cur[k]), indices[hash % tableSize]);
-                    }
-                }
+                });
             }
+            for(size_t j = 0; j < threads.size(); j++)
+                threads[j].join();
         }
+        delete[] indexMutexes;
         auto time3 = Clock::now();
         std::cerr << "Подсчет коммутаторов и приведение подобных: " << (std::chrono::duration_cast<std::chrono::microseconds>(time3 - time2).count())/1000000.0 << " сек" << std::endl;
 
