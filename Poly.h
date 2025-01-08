@@ -8,6 +8,8 @@ class Poly {
 private:
     std::vector<std::shared_ptr<Monom>> data_;
 public:
+    Poly() = default;
+    Poly(const std::string& str);
     void addMonom(std::shared_ptr<Monom> monom);
     std::vector<std::shared_ptr<Monom>> getData();
     bool isZero() const;

@@ -33,7 +33,7 @@ private:
 public:
     Expression() = default;
     //Конструктор от строки
-    Expression(std::string s);
+    Expression(const std::string& s);
     //Конструктор от списка множителей и коэффициента, который по умолчанию 1
     Expression(const std::vector<std::shared_ptr<Sigma>> &v, const std::vector<std::shared_ptr<Monom>> &r, bool imm);
     //Консруктор копирования о оператор присваивания, про них уже было в Base.h

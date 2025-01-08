@@ -15,24 +15,21 @@ extern std::string directoryPath;
 using namespace std;
 //Expression самый главный класс, он включает в себя список элементов класса Sigma (строки Паули) и многочлен (список мономов)
 //конструктор выражения от строки
-Expression::Expression(std::string s)
+Expression::Expression(const std::string& s)
 {
     //Ну это ее при тебе писал, по первому символу вызываем нужные конструкторы, выделяем память и закидываем в список
-    im=false;
-    for (int i = 0; i < (int)s.size(); i++) {
-        if (s[i]=='i'){
-            im=true;
+    im = false;
+    for (size_t i = 0; i < s.size(); i++) {
+        if (s[i] == 'i') {
+            im = true;
             i++;
-        }
-        if (s[i] == '[' || s[i] == ';') {
-            int tmp;
-            std::shared_ptr<Monom> mon(new Monom(s,i,tmp));
-            i = tmp;
-            poly.addMonom(mon);
-            if (s[i] == ']'){
-                i++;
-            } else
-                i--;
+        } else if (s[i] == '[') {
+            size_t end = i + 1;
+            while(end < s.size() && s[end] != ']')
+                end++;
+            assert(end < s.size());
+            poly = Poly(s.substr(i, end - i + 1));
+            i = end + 1;
         } else if (s[i] == 'S') {
             int tmp;
             int j=1;
@@ -59,9 +56,6 @@ Expression::Expression(std::string s)
                 }
             }
             i = tmp;
-        }
-        else if (s[i] == '*') {
-
         } else {
             assert(0);
         }

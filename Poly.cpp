@@ -5,6 +5,21 @@ void Poly::addMonom(std::shared_ptr<Monom> monom) {
     data_.push_back(monom);
 }
 
+Poly::Poly(const std::string& str) {
+    assert(str[0] == '[');
+    assert(str.back() == ']');
+
+    size_t cur = 0;
+    while(str[cur] != ']') {
+        assert(str[cur] == ';' || str[cur] == '[');
+        size_t next = cur + 1;
+        while(str[next] != ';' && str[next] != ']')
+            next++;
+        data_.push_back(std::make_shared<Monom>(str.substr(cur + 1, next - cur - 1)));
+        cur = next;
+    }
+}
+
 std::vector<std::shared_ptr<Monom>> Poly::getData() {
     return data_;
 }

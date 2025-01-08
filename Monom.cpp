@@ -37,18 +37,14 @@ void Monom::Prod2(int n)
 {
     mpz_mul_si(coef,coef,n);
 }
-Monom::Monom(const std::string &s, int pos, int &npos)
-{
+Monom::Monom(const std::string &s) {
     mpz_init(coef);
-    if (s[pos] != '[' && s[pos] != ';') {
-        assert(0);
-    }
-    pos++;
-    while (s[pos] != ']' && s[pos] != ';'){
+    size_t pos = 0;
+    while (pos < s.size()) {
         if (s[pos]==','){
             pos++;
         }
-        string nums="";
+        string nums = "";
         while ((s[pos] >= '0' && s[pos] <= '9') || (s[pos] == '-')){
             nums.push_back(s[pos]);
             pos++;
@@ -60,7 +56,6 @@ Monom::Monom(const std::string &s, int pos, int &npos)
             pows.push_back(std::stoi(nums));
         }
     }
-    npos = pos;
 }
 
 
