@@ -71,7 +71,7 @@ Expression::Expression(const std::vector<std::shared_ptr<Sigma>> &v, const Poly&
         deepCopyBase(t, v[i]);
         lst.push_back(t);
     }
-    poly.deepCopyFrom(r);
+    poly = r;
 }
 //конструктор от выражения
 Expression::Expression(const Expression &ex1)
@@ -82,7 +82,7 @@ Expression::Expression(const Expression &ex1)
         deepCopyBase(t, ex1.lst[i]);
         lst.push_back(t);
     }
-    poly.deepCopyFrom(ex1.poly);
+    poly = ex1.poly;
 } 
 //присваивание выражения
 Expression& Expression::operator=(const Expression &ex1)
@@ -97,7 +97,7 @@ im=ex1.im;
         deepCopyBase(t, ex1.lst[i]);
         lst.push_back(t);
     }
-    poly.deepCopyFrom(ex1.poly);
+    poly = ex1.poly;
     return *this;
 }
 //много вспомогательных функций

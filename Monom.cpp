@@ -5,7 +5,7 @@
 using namespace std;
 //класс мономов, в прицнипе я думал переписать его и сделать класс полиномов, но пока не сделал.
 //моном содежит список степеней и коэффициент. в списке степеней каждому элементу соответвует степень некого параметра, число параметров в принципе не ограничено
-bool Monom::isZero()
+bool Monom::isZero() const
 {
     return (mpz_cmp_si(coef, 0)==0);
 }
@@ -68,7 +68,7 @@ Monom::Monom(const Monom &mn)
     }
     mpz_set(coef,mn.coef);
 }
-bool Monom::operator==(const Monom &mn)
+bool Monom::operator==(const Monom &mn) const
 {
     if ((int)mn.pows.size()!= (int)pows.size()){
         return false;
@@ -83,7 +83,7 @@ bool Monom::operator==(const Monom &mn)
     }
     return true;
 }
-void Monom::print()
+void Monom::print() const
 {
     mpz_out_str(stdout, 10, coef);
     for (int i = 0; i < (int)pows.size(); i++) {
@@ -95,9 +95,3 @@ Monom::~Monom()
    //mpz_clear(coef);
 }
 
-
-
-void deepCopyMonom(std::shared_ptr<Monom> &to, std::shared_ptr<Monom> from)
-{
-    to = std::make_shared<Monom>(*std::dynamic_pointer_cast<Monom>(from));
-}

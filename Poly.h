@@ -6,15 +6,13 @@
 
 class Poly {
 private:
-    std::vector<std::shared_ptr<Monom>> data_;
+    std::vector<Monom> data_;
 public:
     Poly() = default;
     Poly(const std::string& str);
 
     bool isZero() const;
     void print() const;
-
-    void deepCopyFrom(const Poly& other);
 
     Poly& operator+=(const Poly& other);
     Poly operator*(const Poly& other) const;

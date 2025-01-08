@@ -11,17 +11,15 @@ Poly::Poly(const std::string& str) {
         size_t next = cur + 1;
         while(str[next] != ';' && str[next] != ']')
             next++;
-        data_.push_back(std::make_shared<Monom>(str.substr(cur + 1, next - cur - 1)));
+        data_.emplace_back(str.substr(cur + 1, next - cur - 1));
         cur = next;
     }
 }
 
 bool Poly::isZero() const {
-    for (int k= 0; k < (int)data_.size(); k++) {
-        if (data_[k]->isZero()==false){
+    for(size_t i = 0; i < data_.size(); i++)
+        if(!data_[i].isZero())
             return false;
-        }
-    }
     return true;
 }
 
@@ -31,26 +29,18 @@ void Poly::print() const {
         if (i){
             std::cout << ';';
         }
-        data_[i]->print();
+        data_[i].print();
     }
     std::cout << ']';
 }
 
-void Poly::deepCopyFrom(const Poly& other) {
-    for (int i = 0; i < (int)other.data_.size(); i++) {
-        std::shared_ptr<Monom> t;
-        deepCopyMonom(t, other.data_[i]);
-        data_.push_back(t);
-    }
-}
-
 Poly& Poly::operator+=(const Poly& other) {
-    const std::vector<std::shared_ptr<Monom>>& added = other.data_;
+    const std::vector<Monom>& added = other.data_;
     std::vector<bool> goodMonom(added.size(), true);
     for (int l = 0; l < (int)added.size();l++) {
         for (int k= 0; k < data_.size(); k++) {
-            if (*data_[k]==*added[l]){
-                data_[k]->Sum(*added[l]);
+            if (data_[k] == added[l]){
+                data_[k].Sum(added[l]);
                 goodMonom[l] = false;
                 break;
             }
@@ -66,10 +56,9 @@ Poly& Poly::operator+=(const Poly& other) {
 Poly Poly::operator*(const Poly& other) const {
     Poly res;
     for(int32_t i = 0; i < data_.size(); i++) {
-        Poly tmp;
-        tmp.deepCopyFrom(other);
+        Poly tmp = other;
         for(int32_t j = 0; j < tmp.data_.size(); j++)
-            tmp.data_[j]->Prod(*(data_[i]));
+            tmp.data_[j].Prod(data_[i]);
         res += tmp;
     }
     return res;
@@ -81,12 +70,12 @@ bool Poly::operator==(const Poly& other) const {
     std::vector<bool> otherUsed(data_.size(), false);
     for(size_t i = 0; i < data_.size(); i++) {
         for(size_t j = 0; j < other.data_.size(); j++)
-            if(!otherUsed[j] && (*data_[i]) == (*other.data_[j])) {
+            if(!otherUsed[j] && data_[i] == other.data_[j]) {
                 mpz_t coef_i, coef_j;
                 mpz_init(coef_i);
                 mpz_init(coef_j);
-                data_[i]->getCoef(coef_i);
-                other.data_[j]->getCoef(coef_j);
+                data_[i].getCoef(coef_i);
+                other.data_[j].getCoef(coef_j);
                 if(mpz_cmp(coef_i, coef_j) == 0) {
                     otherUsed[j] = true;
                     break;
@@ -101,6 +90,6 @@ bool Poly::operator==(const Poly& other) const {
 
 Poly& Poly::operator*=(int n) {
     for(size_t i = 0; i < data_.size(); i++)
-        data_[i]->Prod2(n);
+        data_[i].Prod2(n);
     return *this;
 }
