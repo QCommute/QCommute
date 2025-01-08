@@ -104,7 +104,6 @@ main(int argc, char** argv)
     setlocale(LC_ALL, "");
     std::vector <Expression> H;//Переменная Гамильтониана
     std::vector <Expression> O;//Переменная Наблюдаемой
-    std::vector <Expression> O1;
     std::vector <int> I;
     std::ifstream file(argv[1], std::ifstream::in);//огткрфваем файл в котором содерижится наблюдаемая и гамильтониан
     std::string str;
@@ -204,41 +203,27 @@ main(int argc, char** argv)
         delete[] indexMutexes;
         auto time3 = Clock::now();
         std::cerr << "Подсчет коммутаторов и приведение подобных: " << (std::chrono::duration_cast<std::chrono::microseconds>(time3 - time2).count())/1000000.0 << " сек" << std::endl;
-
-        std::vector<Node*> O1_tmp;
+        
+        O.clear();
         for(size_t i = 0; i < tableSize; i++) {
             Node* cur_node = indices[i];
             while(cur_node != nullptr) {
-                O1_tmp.push_back(cur_node);
-                cur_node = cur_node->next;
+                if(!cur_node->expr.getPoly().isZero())
+                    O.push_back(std::move(cur_node->expr));
+                Node* next_node = cur_node->next;
+                delete cur_node;
+                cur_node = next_node;
             }
         }
         delete[] indices;
-
-        for(size_t i = 0; i < O1_tmp.size(); i++) {
-            if(!O1_tmp[i]->expr.getPoly().isZero())
-                O1.push_back(std::move(O1_tmp[i]->expr));
-            delete O1_tmp[i];
-        }
-        
-        O.swap(O1);
-        O1.clear();
     
         directoryPath.erase(directoryPath.size()-1);
         std::cerr << std::endl;
     }
     
-//вывод результата, пока он делается просто на экран
-if ((int)O.size()!=0){
-    for (int i= 0; i < (int)O.size(); i++) {
+    //вывод результата, пока он делается просто на экран
+    for (size_t i = 0; i < O.size(); i++)
         O[i].print();
-    }
-}
-else{
-    for (int i= 0; i < (int)O1.size(); i++) {
-        O1[i].print();
-    }
-}
 
 auto time1 = Clock::now();
 std::cerr << "Вычисление заняло "<< (std::chrono::duration_cast<std::chrono::microseconds>(time1 - start_time).count())/1000000.0 << " сек" << std::endl;
