@@ -63,7 +63,7 @@ Expression::Expression(const std::string& s)
 }
 
 //Просто глубокое копирование списка и присваивание коэффициента
-Expression::Expression(const std::vector<std::shared_ptr<Sigma>> &v, const std::vector<std::shared_ptr<Monom>> &r, bool imm)
+Expression::Expression(const std::vector<std::shared_ptr<Sigma>> &v, const Poly& r, bool imm)
 {
     im=imm;
     for (int i = 0; i < (int)v.size(); i++) {
@@ -71,11 +71,7 @@ Expression::Expression(const std::vector<std::shared_ptr<Sigma>> &v, const std::
         deepCopyBase(t, v[i]);
         lst.push_back(t);
     }
-    for (int i = 0; i < (int)r.size(); i++) {
-        std::shared_ptr<Monom> t;
-        deepCopyMonom(t, r[i]);
-        poly.addMonom(t);
-    }
+    poly.deepCopyFrom(r);
 }
 //конструктор от выражения
 Expression::Expression(const Expression &ex1)
@@ -125,10 +121,8 @@ int Expression::getLength() const
 void Expression::Commute(std::vector <Expression> &O1,  const Expression &O)
 {
     //работа с полиномами, а именно их умножение
-    std::vector<std::shared_ptr<Monom>> pol1 = (poly * O.poly).getData();
-    for (int i = 0; i < (int)pol1.size(); i++) {
-        pol1[i]->Prod2(2);
-    }
+    Poly pol1 = poly * O.poly;
+    pol1 *= 2;
 
     //отсюда начинается сама коммутация в прицнипе тут осбо модно ничего не комментировать главное то как записывается результат в конце , там будет комментарий
     std::vector<std::shared_ptr<Sigma>> lst1;
@@ -146,8 +140,7 @@ void Expression::Commute(std::vector <Expression> &O1,  const Expression &O)
              auto s11 = std::dynamic_pointer_cast<Sigma1d>(lst1[j]);
              auto s21 = std::dynamic_pointer_cast<Sigma2d>(lst1[j]);
              auto s31 = std::dynamic_pointer_cast<Sigma3d>(lst1[j]);
-             if (s1){
-                bool b=false;
+             if (s1) {
                 if (s1->getC()==s11->getC()){
                     continue;
                 }
@@ -240,29 +233,19 @@ void Expression::Commute(std::vector <Expression> &O1,  const Expression &O)
                         t->setPoint(t->getPoint()-mp+1);
                     }
                 }
-                imm=imm % 4;
-                bool im1=false;
-                if (imm==1){
-                    im1=true;
-                }
-                if (imm==2){
-                    for (int k = 0; k < (int)pol1.size(); k++) {
-                        pol1[k]->Prod2(-1);
-                    }
+                imm = imm % 4;
+                bool b = false;
+                if (imm==2) {
+                    pol1 *= -1;
                     b=true;
                 }
-                if (imm==3){
-                    im1=true;
-                    for (int k = 0; k < (int)pol1.size(); k++) {
-                        pol1[k]->Prod2(-1);
-                    }
+                if (imm==3) {
+                    pol1 *= -1;
                     b=true;
                 }
-                Expression n_exp(lst3,pol1,im1);
+                Expression n_exp(lst3, pol1, (imm % 2) == 1);
                 if (b==true){
-                    for (int k = 0; k < (int)pol1.size(); k++) {
-                        pol1[k]->Prod2(-1);
-                    }
+                    pol1 *= -1;
                 }
                 O1.push_back(n_exp);
              }
@@ -382,29 +365,23 @@ void Expression::Commute(std::vector <Expression> &O1,  const Expression &O)
                         t->setPoint2(t->getPoint2()-mp2+1);
                     }
                 }
-                imm=imm % 4;
+                imm = imm % 4;
                 bool im1=false;
                 if (imm==1){
                     im1=true;
                 }
                 if (imm==2){
-                    for (int k = 0; k < (int)pol1.size(); k++) {
-                        pol1[k]->Prod2(-1);
-                    }
+                    pol1 *= -1;
                     b=true;
                 }
                 if (imm==3){
                     im1=true;
-                    for (int k = 0; k < (int)pol1.size(); k++) {
-                        pol1[k]->Prod2(-1);
-                    }
+                    pol1 *= -1;
                     b=true;
                 }
-                Expression n_exp(lst3,pol1,im1); //это строчка с коэффициентов, таких утт создается много, все они в целом дают результат 
+                Expression n_exp(lst3, pol1, im1); //это строчка с коэффициентов, таких утт создается много, все они в целом дают результат 
                 if (b==true){
-                    for (int k = 0; k < (int)pol1.size(); k++) {
-                        pol1[k]->Prod2(-1);
-                    }
+                    pol1 *= -1;
                 }
                 uint8_t Tl= n_exp.TotalLength();
                 uint8_t Mp= n_exp.MaxPoint();

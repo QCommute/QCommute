@@ -10,8 +10,7 @@ private:
 public:
     Poly() = default;
     Poly(const std::string& str);
-    void addMonom(std::shared_ptr<Monom> monom);
-    std::vector<std::shared_ptr<Monom>> getData();
+
     bool isZero() const;
     void print() const;
 
@@ -21,4 +20,5 @@ public:
     Poly operator*(const Poly& other) const;
     // Точное равенство, включая коэффициенты
     bool operator==(const Poly& other) const;
+    Poly& operator*=(int n);
 };

@@ -1,10 +1,6 @@
 #include "Poly.h"
 #include <gmp-x86_64.h>
 
-void Poly::addMonom(std::shared_ptr<Monom> monom) {
-    data_.push_back(monom);
-}
-
 Poly::Poly(const std::string& str) {
     assert(str[0] == '[');
     assert(str.back() == ']');
@@ -18,10 +14,6 @@ Poly::Poly(const std::string& str) {
         data_.push_back(std::make_shared<Monom>(str.substr(cur + 1, next - cur - 1)));
         cur = next;
     }
-}
-
-std::vector<std::shared_ptr<Monom>> Poly::getData() {
-    return data_;
 }
 
 bool Poly::isZero() const {
@@ -48,7 +40,7 @@ void Poly::deepCopyFrom(const Poly& other) {
     for (int i = 0; i < (int)other.data_.size(); i++) {
         std::shared_ptr<Monom> t;
         deepCopyMonom(t, other.data_[i]);
-        addMonom(t);
+        data_.push_back(t);
     }
 }
 
@@ -66,7 +58,7 @@ Poly& Poly::operator+=(const Poly& other) {
     }
     for (int l = 0; l < (int)added.size(); l++) {
         if(goodMonom[l])
-            addMonom(added[l]);
+            data_.push_back(added[l]);
     }
     return *this;
 }
@@ -105,4 +97,10 @@ bool Poly::operator==(const Poly& other) const {
         if(!otherUsed[i])
             return false;
     return true;
+}
+
+Poly& Poly::operator*=(int n) {
+    for(size_t i = 0; i < data_.size(); i++)
+        data_[i]->Prod2(n);
+    return *this;
 }

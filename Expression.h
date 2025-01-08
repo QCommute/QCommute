@@ -10,13 +10,11 @@
 #include <cstdio>
 #include <memory>
 #include "Sigma.h"
-#include "Monom.h"
 #include "Poly.h"
 int PrimeNumber(int n);
 int LeviChivita(int i, int j);
 bool prime(long int n);
 class Sigma;
-class Monom;
 
 //Класс для выражения. Возможно основной класс в программе
 
@@ -24,7 +22,6 @@ class Expression {
     friend struct ExpressionHasher;
 private:
     //коэффициент
-    //std::vector<std::shared_ptr<Monom>> poly;
     Poly poly;
     //Список сигм
     std::vector<std::shared_ptr<Sigma>> lst;
@@ -35,7 +32,7 @@ public:
     //Конструктор от строки
     Expression(const std::string& s);
     //Конструктор от списка множителей и коэффициента, который по умолчанию 1
-    Expression(const std::vector<std::shared_ptr<Sigma>> &v, const std::vector<std::shared_ptr<Monom>> &r, bool imm);
+    Expression(const std::vector<std::shared_ptr<Sigma>> &v, const Poly& r, bool imm);
     //Консруктор копирования о оператор присваивания, про них уже было в Base.h
     Expression(const Expression &ex1);
     void Commute(std::vector <Expression> &O1,  const Expression &O);
