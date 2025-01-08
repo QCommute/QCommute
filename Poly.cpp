@@ -39,7 +39,7 @@ Poly& Poly::operator+=(const Poly& other) {
     std::vector<bool> goodMonom(added.size(), true);
     for (int l = 0; l < (int)added.size();l++) {
         for (int k= 0; k < data_.size(); k++) {
-            if (data_[k] == added[l]){
+            if (data_[k].samePowers(added[l])) {
                 data_[k].Sum(added[l]);
                 goodMonom[l] = false;
                 break;
@@ -58,7 +58,7 @@ Poly Poly::operator*(const Poly& other) const {
     for(int32_t i = 0; i < data_.size(); i++) {
         Poly tmp = other;
         for(int32_t j = 0; j < tmp.data_.size(); j++)
-            tmp.data_[j].Prod(data_[i]);
+            tmp.data_[j] *= data_[i];
         res += tmp;
     }
     return res;
@@ -71,15 +71,8 @@ bool Poly::operator==(const Poly& other) const {
     for(size_t i = 0; i < data_.size(); i++) {
         for(size_t j = 0; j < other.data_.size(); j++)
             if(!otherUsed[j] && data_[i] == other.data_[j]) {
-                mpz_t coef_i, coef_j;
-                mpz_init(coef_i);
-                mpz_init(coef_j);
-                data_[i].getCoef(coef_i);
-                other.data_[j].getCoef(coef_j);
-                if(mpz_cmp(coef_i, coef_j) == 0) {
-                    otherUsed[j] = true;
-                    break;
-                }
+                otherUsed[j] = true;
+                break;
             }
     }
     for(size_t i = 0; i < data_.size(); i++)
@@ -90,6 +83,6 @@ bool Poly::operator==(const Poly& other) const {
 
 Poly& Poly::operator*=(int n) {
     for(size_t i = 0; i < data_.size(); i++)
-        data_[i].Prod2(n);
+        data_[i] *= n;
     return *this;
 }

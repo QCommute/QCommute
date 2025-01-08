@@ -8,33 +8,33 @@
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
-#include <memory>
+#include <cstdint>
 #include <gmpxx.h>
 
-class Monom
-{
+class Monom {
 private:
     std::vector<uint8_t> pows; //список степеней
     mpz_t coef; //коэффициент
 public:
-    //Конструктор от простого оператора и аргумента
-    //Monom(const std::vector<int> pows_, int coef_);
-    //Конструктор от строки
-    bool operator==(const Monom &mn) const;
-    Monom(const Monom &mn);
     Monom(const std::string &s);
-    Monom operator* (const Monom &mn);
-    //Monom operator+ (const Monom &mn);
-    //Перегрузка конструктора копирования (последние 2 важны т.к. мы храним список указателей и при копировании недостаточно просто скопировать указатели, нужно копировать память на которую они ссылаются. Конструктор копирования и оператор присваивания недостаточно умны чтобы это делать, поэтому их приходится переопределять и перегружать самостоятельно)
-    void print() const;
+    Monom(const Monom& other);
+    Monom& operator=(const Monom& other);
+    Monom(Monom&& other);
+    Monom& operator=(Monom&& other);
+
+    bool operator==(const Monom& other) const;
     bool isZero() const;
-    void Prod(const Monom &mn);
+    bool samePowers(const Monom& other) const;
+    
     void Sum(const Monom &mn);
-    void Prod2(int n);
+    Monom& operator*=(const Monom& other);
+    Monom& operator*=(int n);
+
     //std::vector<int> getPows() const;
     void setCoef(mpz_t c_);
     void getCoef(mpz_t& res) const;
-   //void setPoint(int p_);
+    //void setPoint(int p_);
+    void print() const;
     ~Monom();
 };
 
