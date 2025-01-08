@@ -130,17 +130,17 @@ void Expression::Commute(std::vector <Expression> &O1,  const Expression &O)
         lst1.push_back(O.lst[i]);
     }
     for (int i = 0; i < (int)lst.size(); i++) {
-         for (int j = 0; j < (int)lst1.size(); j++){
-             if (lst[i]->getType()!=lst1[j]->getType()){
+        for (int j = 0; j < (int)lst1.size(); j++){
+            if (lst[i]->getType()!=lst1[j]->getType()){
                 continue;
-             }
-             auto s1 = std::dynamic_pointer_cast<Sigma1d>(lst[i]);
-             auto s2 = std::dynamic_pointer_cast<Sigma2d>(lst[i]);
-             auto s3 = std::dynamic_pointer_cast<Sigma3d>(lst[i]);
-             auto s11 = std::dynamic_pointer_cast<Sigma1d>(lst1[j]);
-             auto s21 = std::dynamic_pointer_cast<Sigma2d>(lst1[j]);
-             auto s31 = std::dynamic_pointer_cast<Sigma3d>(lst1[j]);
-             if (s1) {
+            }
+            auto s1 = std::dynamic_pointer_cast<Sigma1d>(lst[i]);
+            auto s2 = std::dynamic_pointer_cast<Sigma2d>(lst[i]);
+            auto s3 = std::dynamic_pointer_cast<Sigma3d>(lst[i]);
+            auto s11 = std::dynamic_pointer_cast<Sigma1d>(lst1[j]);
+            auto s21 = std::dynamic_pointer_cast<Sigma2d>(lst1[j]);
+            auto s31 = std::dynamic_pointer_cast<Sigma3d>(lst1[j]);
+            if (s1) {
                 if (s1->getC()==s11->getC()){
                     continue;
                 }
@@ -158,7 +158,7 @@ void Expression::Commute(std::vector <Expression> &O1,  const Expression &O)
                     nc=nc*(-1);
                 }
                 int pd=s11->getPoint()-s1->getPoint();
-                std::vector<std::shared_ptr<Sigma>> lst3;
+                std::vector<std::shared_ptr<Sigma1d>> lst3;
                 for (int k = 0; k < (int)lst.size(); k++) {
                     std::shared_ptr<Sigma> tt;
                     deepCopyBase(tt, lst[k]);
@@ -183,71 +183,57 @@ void Expression::Commute(std::vector <Expression> &O1,  const Expression &O)
                     }
                     lst3.push_back(t);
                 }
-                int mp=0;
+
+                // ??? схлопываем сигмы, попавшие в одну точку
                 int nn=0;
-                for (int k = 0; k < (int)lst3.size(); k++) {
-                    auto t = std::dynamic_pointer_cast<Sigma1d>(lst3[k]);
-                    bool bb=false;
-                    for (int l = k+1; l < (int)lst3.size(); l++) {
-                        auto t1 = std::dynamic_pointer_cast<Sigma1d>(lst3[l]);
-                        if (t->getPoint()==t1->getPoint()){
-                            if (t->getC()==t1->getC()){
-                                bb=true;
-                                lst3.erase(lst3.begin()+l);
-                                lst3.erase(lst3.begin()+k);
-                                k--;
-                                break;
+                std::sort(lst3.begin(), lst3.end(), [](const std::shared_ptr<Sigma1d>& s1, const std::shared_ptr<Sigma1d>& s2) {
+                    return (*s1) < (*s2);
+                });
+                std::vector<std::shared_ptr<Sigma1d>> lst32;
+                for(size_t k = 0; k < lst3.size(); k++) {
+                    if(!lst32.empty() && lst32.back()->getPoint() == lst3[k]->getPoint()) {
+                        if(lst32.back()->getC() == lst3[k]->getC())
+                            lst32.pop_back();
+                        else {
+                            nn++;
+                            int nc2 = LeviChivita(lst32.back()->getC(), lst3[k]->getC());
+                            imm++;
+                            if (nc2 < 0) {
+                                nc2 = -nc2;
+                                imm += 2;
                             }
-                            else{
-                                nn++;
-                                nc=LeviChivita(t->getC(),t1->getC());
-                                imm++;
-                                if (nc<0){
-                                    nc=nc*(-1);
-                                    imm+=2;
-                                }
-                                t->setC(nc);
-                                lst3.erase(lst3.begin()+l);
-                                l--;
-                                continue;
-                            }
+                            lst32.back()->setC(nc2);
                         }
-                    }
-                    if (bb==false){
-                        if (mp==0){
-                            mp=t->getPoint();
-                        }
-                        else{
-                            if (mp>t->getPoint()){
-                                mp=t->getPoint();
-                            }
-                        }
-                    }
+                    } else
+                        lst32.push_back(lst3[k]);
                 }
-                if ((nn % 2) != 0){
+                lst3 = lst32;
+                if ((nn % 2) != 0) {
                     continue;
+                }
+
+                // ??? сдвигаем минимум в точку 1
+                int mp=0;
+                for(size_t k = 0; k < lst3.size(); k++) {
+                    if (mp == 0){
+                        mp = lst3[k]->getPoint();
+                    }
+                    else
+                        mp = std::min(mp, lst3[k]->getPoint());
                 }
                 if (mp>1){
                     for (int k = 0; k < (int)lst3.size(); k++) {
-                        auto t = std::dynamic_pointer_cast<Sigma1d>(lst3[k]);
+                        auto t = lst3[k];
                         t->setPoint(t->getPoint()-mp+1);
                     }
                 }
+
+                // ??? создаем новое выражение
+                std::vector<std::shared_ptr<Sigma>> lstRes;
+                for(size_t k =0 ; k < lst3.size(); k++)
+                    lstRes.push_back(lst3[k]);
                 imm = imm % 4;
-                bool b = false;
-                if (imm==2) {
-                    pol1 *= -1;
-                    b=true;
-                }
-                if (imm==3) {
-                    pol1 *= -1;
-                    b=true;
-                }
-                Expression n_exp(lst3, pol1, (imm % 2) == 1);
-                if (b==true){
-                    pol1 *= -1;
-                }
-                O1.push_back(n_exp);
+                O1.emplace_back(lstRes, pol1 * ((imm == 2 || imm == 3) ? (-1) : 1), (imm % 2) == 1);
              }
              if (s2){
                 bool b=false;

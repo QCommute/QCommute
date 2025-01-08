@@ -19,4 +19,5 @@ public:
     // Точное равенство, включая коэффициенты
     bool operator==(const Poly& other) const;
     Poly& operator*=(int n);
+    Poly operator*(int n) const;
 };

@@ -86,3 +86,9 @@ Poly& Poly::operator*=(int n) {
         data_[i] *= n;
     return *this;
 }
+
+Poly Poly::operator*(int n) const {
+    Poly res = *this;
+    res *= n;
+    return res;
+}
