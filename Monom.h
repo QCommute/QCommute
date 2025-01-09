@@ -25,6 +25,7 @@ public:
     bool operator==(const Monom& other) const;
     bool isZero() const;
     bool samePowers(const Monom& other) const;
+    bool lessPowers(const Monom& other) const;
     
     void Sum(const Monom &mn);
     Monom& operator*=(const Monom& other);

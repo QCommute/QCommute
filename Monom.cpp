@@ -68,6 +68,10 @@ bool Monom::samePowers(const Monom& other) const {
     return pows == other.pows;
 }
 
+bool Monom::lessPowers(const Monom& other) const {
+    return pows < other.pows;
+}
+
 void Monom::Sum(const Monom& mn) {
     mpz_add(coef, coef, mn.coef);
 }
