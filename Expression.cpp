@@ -234,8 +234,8 @@ void Expression::Commute(std::vector <Expression> &O1,  const Expression &O)
                     lstRes.push_back(lst3[k]);
                 imm = imm % 4;
                 O1.emplace_back(lstRes, pol1 * ((imm == 2 || imm == 3) ? (-1) : 1), (imm % 2) == 1);
-             }
-             if (s2){
+            }
+            if (s2){
                 bool b=false;
                 if (s2->getC()==s21->getC()){
                     continue;
@@ -246,7 +246,7 @@ void Expression::Commute(std::vector <Expression> &O1,  const Expression &O)
                 if (O.im==true){
                     imm++;
                 }
-                 if (im==true){
+                if (im==true){
                     imm++;
                 }
                 if (nc<0){
@@ -255,7 +255,7 @@ void Expression::Commute(std::vector <Expression> &O1,  const Expression &O)
                 }
                 int pd1=s21->getPoint1()-s2->getPoint1();
                 int pd2=s21->getPoint2()-s2->getPoint2();
-                std::vector<std::shared_ptr<Sigma>> lst3;
+                std::vector<std::shared_ptr<Sigma2d>> lst3;
                 for (int k = 0; k < (int)lst.size(); k++) {
                     std::shared_ptr<Sigma> tt;
                     deepCopyBase(tt, lst[k]);
@@ -286,89 +286,70 @@ void Expression::Commute(std::vector <Expression> &O1,  const Expression &O)
                     }
                     lst3.push_back(t);
                 }
-                int mp1=0;
-                int mp2=0;
+
+                // ??? схлопываем сигмы, попавшие в одну точку
                 int nn=0;
-                for (int k = 0; k < (int)lst3.size(); k++) {
-                    auto t = std::dynamic_pointer_cast<Sigma2d>(lst3[k]);
-                    bool bb=false;
-                    for (int l = k+1; l < (int)lst3.size(); l++) {
-                        auto t1 = std::dynamic_pointer_cast<Sigma2d>(lst3[l]);
-                        if (t->getPoint1()==t1->getPoint1() && t->getPoint2()==t1->getPoint2()){
-                            if (t->getC()==t1->getC()){
-                                bb=true;
-                                lst3.erase(lst3.begin()+l);
-                                lst3.erase(lst3.begin()+k);
-                                k--;
-                                break;
+                std::sort(lst3.begin(), lst3.end(), [](const std::shared_ptr<Sigma2d>& s1, const std::shared_ptr<Sigma2d>& s2) {
+                    return (*s1) < (*s2);
+                });
+                std::vector<std::shared_ptr<Sigma2d>> lst32;
+                for(size_t k = 0; k < lst3.size(); k++) {
+                    if(!lst32.empty() && lst32.back()->getPoint1() == lst3[k]->getPoint1() && lst32.back()->getPoint2() == lst3[k]->getPoint2()) {
+                        if(lst32.back()->getC() == lst3[k]->getC())
+                            lst32.pop_back();
+                        else {
+                            nn++;
+                            int nc2 = LeviChivita(lst32.back()->getC(), lst3[k]->getC());
+                            imm++;
+                            if (nc2 < 0) {
+                                nc2 = -nc2;
+                                imm += 2;
                             }
-                            else{
-                                nn++;
-                                nc=LeviChivita(t->getC(),t1->getC());
-                                imm++;
-                                if (nc<0){
-                                    nc=nc*(-1);
-                                    imm+=2;
-                                }
-                                t->setC(nc);
-                                lst3.erase(lst3.begin()+l);
-                                l--;
-                                continue;
-                            }
+                            lst32.back()->setC(nc2);
                         }
-                    }
-                    if (bb==false){
-                        if (mp1==0){
-                            mp1=t->getPoint1();
-                        }
-                        else{
-                            if (mp1>t->getPoint1()){
-                                mp1=t->getPoint1();
-                            }
-                        }
-                        if (mp2==0){
-                            mp2=t->getPoint2();
-                        }
-                        else{
-                            if (mp2>t->getPoint2()){
-                                mp2=t->getPoint2();
-                            }
-                        }
-                    }
+                    } else
+                        lst32.push_back(lst3[k]);
                 }
+                lst3 = lst32;
                 if ((nn % 2) != 0){
                     continue;
                 }
+
+                // ??? сдвигаем минимум в точку (1, 1)
+                int mp1=0;
+                int mp2=0;
+                for(size_t k = 0; k < lst3.size(); k++) {
+                    if (mp1==0){
+                        mp1=lst3[k]->getPoint1();
+                    }
+                    else
+                        mp1 = std::min(mp1, lst3[k]->getPoint1());
+                    if (mp2==0){
+                        mp2=lst3[k]->getPoint2();
+                    }
+                    else
+                        mp2 = std::min(mp2, lst3[k]->getPoint2());
+                }
                 if (mp1>1){
                     for (int k = 0; k < (int)lst3.size(); k++) {
-                        auto t = std::dynamic_pointer_cast<Sigma2d>(lst3[k]);
+                        auto t = lst3[k];
                         t->setPoint1(t->getPoint1()-mp1+1);
                     }
                 }
                 if (mp2>1){
                     for (int k = 0; k < (int)lst3.size(); k++) {
-                        auto t = std::dynamic_pointer_cast<Sigma2d>(lst3[k]);
+                        auto t = lst3[k];
                         t->setPoint2(t->getPoint2()-mp2+1);
                     }
                 }
+
+                // ??? создаем новое выражение
+                std::vector<std::shared_ptr<Sigma>> lstRes;
+                for(size_t k =0 ; k < lst3.size(); k++)
+                    lstRes.push_back(lst3[k]);
                 imm = imm % 4;
-                bool im1=false;
-                if (imm==1){
-                    im1=true;
-                }
-                if (imm==2){
-                    pol1 *= -1;
-                    b=true;
-                }
-                if (imm==3){
-                    im1=true;
-                    pol1 *= -1;
-                    b=true;
-                }
-                Expression n_exp(lst3, pol1, im1); //это строчка с коэффициентов, таких утт создается много, все они в целом дают результат 
-                if (b==true){
-                    pol1 *= -1;
-                }
+                Expression n_exp(lstRes, pol1 * ((imm == 2 || imm == 3) ? (-1) : 1), (imm % 2) == 1); //это строчка с коэффициентов, таких утт создается много, все они в целом дают результат 
+                
                 uint8_t Tl= n_exp.TotalLength();
                 uint8_t Mp= n_exp.MaxPoint();
                 mpz_t mbr_x;
