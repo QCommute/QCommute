@@ -16,17 +16,17 @@ class Sigma
 {
 protected:
     //Тип элемента (Operator, Delta, Ghost)
-    int type;
+    //int type;
 public:
     //Функция вывода объекта на экран. Зануление делает класс Base абстрактным и заставляет каждый его наследник перегружать функцию print
     virtual void print() = 0;
    // virtual bool operator==(Base) = 0;
-    int getType() const;
+    virtual int getType() const = 0;
     //virtual int getVal()=0;
     //virtual void setVal(int val_)=0;
     virtual size_t getHash() = 0;
     //Деструктор, в данном случае важно что он виртуальный, чтобы для наследников запускались их деструкторы, а не только деструктор базового класса
-    virtual ~Sigma();
+    virtual ~Sigma() = default;
 };
 
 class Sigma1d: public Sigma
@@ -48,13 +48,14 @@ public:
     Sigma1d(const Sigma1d &op);
     //Вывод
     void print();
+    int getType() const override;
     int getPoint();
     int getC();
     void setC(int c_);
     void setPoint(int p_);
     size_t getHash() override;
     bool operator<(const Sigma1d& other) const;
-    ~Sigma1d();
+    ~Sigma1d() override = default;
 };
 
 
@@ -78,6 +79,7 @@ public:
     Sigma2d(const Sigma2d &op);
     //Вывод
     void print();
+    int getType() const override;
     int getPoint1();
     int getPoint2();
     int getC();
@@ -86,7 +88,7 @@ public:
     void setPoint2(int p2_);
     size_t getHash() override;
     bool operator<(const Sigma2d& other) const;
-    ~Sigma2d();
+    ~Sigma2d() override = default;
 };
 
 class Sigma3d: public Sigma
@@ -110,11 +112,12 @@ public:
     Sigma3d(const Sigma3d &op);
     //Вывод
     void print();
+    int getType() const override;
     int getPoint1();
     void setPoint(int p1_, int p2_, int p3_);
     size_t getHash() override;
     bool operator<(const Sigma3d& other) const;
-    ~Sigma3d();
+    ~Sigma3d() override = default;
 };
 
 

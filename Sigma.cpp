@@ -12,14 +12,6 @@ uint64_t splitmix64(int x) {
 
 extern int indcount;
 extern int lorindcount;
-int Sigma::getType() const
-{
-    return type;
-}
-Sigma::~Sigma()
-{
-
-}
 
  //описание класса Sigma тут особо комментировать нечего, разве что тут фактически три класса для одномерной, двумерной или трехмерной задачи
 int Sigma1d::getPoint()
@@ -40,13 +32,11 @@ void Sigma1d::setC(int c_)
 }
 Sigma1d::Sigma1d(int p_, int c_)
 {
-    type = 1;
     p=p_;
     c=c_;
 }
 Sigma1d::Sigma1d(const std::string &s, int pos, int &npos)
 {
-    type = 1;
     p=1;
     c=1;
     //Проверяет что строка начинается действительно с D или g и в случае успеха распознаем эти операторы (до аргументов), выделяем под них память и кладем в список
@@ -92,7 +82,6 @@ Sigma1d::Sigma1d(const std::string &s, int pos, int &npos)
 //Просто глубокое присваивание двух операторов - сначала освободили старую память, потом выделели новую
 Sigma1d& Sigma1d::operator=(const Sigma1d &sg)
 {
-    type = 1;
     p=sg.p;
     c=sg.c;
     return *this;
@@ -100,7 +89,6 @@ Sigma1d& Sigma1d::operator=(const Sigma1d &sg)
 
 Sigma1d::Sigma1d(const Sigma1d &sg)
 {
-    type = 1;
     p=sg.p;
     c=sg.c;
 }
@@ -122,15 +110,14 @@ void Sigma1d::print()
     }
     std::cout << '(' << p << ')';
 }
+int Sigma1d::getType() const {
+    return 1;
+}
 size_t Sigma1d::getHash() {
-    return type ^ splitmix64(p) ^ c;
+    return splitmix64(p) ^ c;
 }
 bool Sigma1d::operator<(const Sigma1d& other) const {
     return std::tie(p, c) < std::tie(other.p, other.c);
-}
-Sigma1d::~Sigma1d()
-{
-
 }
 
 int Sigma2d::getPoint1()
@@ -159,14 +146,12 @@ void Sigma2d::setPoint2(int p2_)
 }
 Sigma2d::Sigma2d(int p1_, int p2_, int c_)
 {
-    type = 2;
     p1=p1_;
     p2=p2_;
     c=c_;
 }
 Sigma2d::Sigma2d(const std::string &s, int pos, int &npos)
 {
-    type = 2;
     p1=1;
     p2=1;
     c=1;
@@ -223,7 +208,6 @@ Sigma2d::Sigma2d(const std::string &s, int pos, int &npos)
 //Просто глубокое присваивание двух операторов - сначала освободили старую память, потом выделели новую
 Sigma2d& Sigma2d::operator=(const Sigma2d &sg)
 {
-    type = 2;
     p1=sg.p1;
     p2=sg.p2;
     c=sg.c;
@@ -232,7 +216,6 @@ Sigma2d& Sigma2d::operator=(const Sigma2d &sg)
 
 Sigma2d::Sigma2d(const Sigma2d &sg)
 {
-    type = 2;
     p1=sg.p1;
     p2=sg.p2;
     c=sg.c;
@@ -255,15 +238,14 @@ void Sigma2d::print()
     }
     std::cout << '(' << p1 << ',' << p2 << ')';
 }
+int Sigma2d::getType() const {
+    return 2;
+}
 size_t Sigma2d::getHash() {
-    return type ^ splitmix64(p1) ^ splitmix64(p2) ^ c;
+    return splitmix64(p1) ^ splitmix64(p2) ^ c;
 }
 bool Sigma2d::operator<(const Sigma2d& other) const {
     return std::tie(p1, p2, c) < std::tie(other.p1, other.p2, other.c);
-}
-Sigma2d::~Sigma2d()
-{
-
 }
 
 int Sigma3d::getPoint1()
@@ -278,7 +260,6 @@ void Sigma3d::setPoint(int p1_, int p2_, int p3_)
 }
 Sigma3d::Sigma3d(int p1_, int p2_, int p3_, int c_)
 {
-    type = 3;
     p1=p1_;
     p2=p2_;
     p2=p2_;
@@ -286,7 +267,6 @@ Sigma3d::Sigma3d(int p1_, int p2_, int p3_, int c_)
 }
 Sigma3d::Sigma3d(const std::string &s, int pos, int &npos)
 {
-    type = 3;
     p1=1;
     p2=1;
     p3=1;
@@ -354,7 +334,6 @@ Sigma3d::Sigma3d(const std::string &s, int pos, int &npos)
 //Просто глубокое присваивание двух операторов - сначала освободили старую память, потом выделели новую
 Sigma3d& Sigma3d::operator=(const Sigma3d &sg)
 {
-    type = 3;
     p1=sg.p1;
     p2=sg.p2;
     p3=sg.p3;
@@ -364,7 +343,6 @@ Sigma3d& Sigma3d::operator=(const Sigma3d &sg)
 
 Sigma3d::Sigma3d(const Sigma3d &sg)
 {
-    type = 3;
     p1=sg.p1;
     p2=sg.p2;
     p3=sg.p3;
@@ -388,19 +366,15 @@ void Sigma3d::print()
     }
     std::cout << '(' << p1 << ',' << p2 << ',' << p3 << ')';
 }
+int Sigma3d::getType() const {
+    return 3;
+}
 size_t Sigma3d::getHash() {
-    return type ^ splitmix64(p1) ^ splitmix64(p2) ^ splitmix64(p3) ^ c;
+    return splitmix64(p1) ^ splitmix64(p2) ^ splitmix64(p3) ^ c;
 }
 bool Sigma3d::operator<(const Sigma3d& other) const {
     return std::tie(p1, p2, p3, c) < std::tie(other.p1, other.p2, other.p3, other.c);
 }
-Sigma3d::~Sigma3d()
-{
-
-}
-
-
-
 
 void deepCopyBase(std::shared_ptr<Sigma> &to, std::shared_ptr<Sigma> from)
 {
