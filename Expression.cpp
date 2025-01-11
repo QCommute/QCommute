@@ -19,6 +19,8 @@ Expression::Expression(const std::string& s)
 {
     //Ну это ее при тебе писал, по первому символу вызываем нужные конструкторы, выделяем память и закидываем в список
     im = false;
+    dim = 0;
+    std::vector<std::shared_ptr<Sigma>> lst;
     for (size_t i = 0; i < s.size(); i++) {
         if (s[i] == 'i') {
             im = true;
@@ -39,16 +41,19 @@ Expression::Expression(const std::string& s)
             if (j==4){
                 std::shared_ptr<Sigma1d> ptr(new Sigma1d(s,i,tmp));
                 lst.push_back(ptr);
+                dim = 1;
             }
             else{
                 if (j==6){
                     std::shared_ptr<Sigma2d> ptr(new Sigma2d(s,i,tmp));
                     lst.push_back(ptr);
+                    dim = 2;
                 }
                 else{
                     if (j==8){
                         std::shared_ptr<Sigma3d> ptr(new Sigma3d(s,i,tmp));
                         lst.push_back(ptr);
+                        dim = 3;
                     }
                     else{
                         assert(0);
@@ -60,50 +65,86 @@ Expression::Expression(const std::string& s)
             assert(0);
         }
     }
+    
+    if(dim == 1) {
+        std::vector<std::shared_ptr<Sigma1d>> lst2;
+        for(size_t i = 0; i < lst.size(); i++)
+            lst2.push_back(std::dynamic_pointer_cast<Sigma1d>(lst[i]));
+        setSigmas1D(lst2);
+    } else if(dim == 2) {
+        std::vector<std::shared_ptr<Sigma2d>> lst2;
+        for(size_t i = 0; i < lst.size(); i++)
+            lst2.push_back(std::dynamic_pointer_cast<Sigma2d>(lst[i]));
+        setSigmas2D(lst2);
+    }
 }
 
-//Просто глубокое копирование списка и присваивание коэффициента
-Expression::Expression(const std::vector<std::shared_ptr<Sigma>> &v, const Poly& r, bool imm)
-{
-    im=imm;
-    for (int i = 0; i < (int)v.size(); i++) {
-        std::shared_ptr<Sigma> t;
-        deepCopyBase(t, v[i]);
-        lst.push_back(t);
-    }
+Expression::Expression(const std::vector<std::shared_ptr<Sigma1d>> &v, const Poly& r, bool imm) {
+    im = imm;
+    dim = 1;
+    setSigmas1D(v);
     poly = r;
 }
-//конструктор от выражения
-Expression::Expression(const Expression &ex1)
-{
-    im=ex1.im;
-    for (int i = 0; i < (int)ex1.lst.size(); i++) {
-        std::shared_ptr<Sigma> t;
-        deepCopyBase(t, ex1.lst[i]);
-        lst.push_back(t);
-    }
-    poly = ex1.poly;
-} 
-//присваивание выражения
-Expression& Expression::operator=(const Expression &ex1)
-{
-im=ex1.im;
-    //for (int i = 0; i < (int)lst.size(); i++) {
-    //    delete lst[i];
-    //}
-    lst.clear();
-    for (int i = 0; i < (int)ex1.lst.size(); i++) {
-        std::shared_ptr<Sigma> t;
-        deepCopyBase(t, ex1.lst[i]);
-        lst.push_back(t);
-    }
-    poly = ex1.poly;
-    return *this;
+
+Expression::Expression(const std::vector<std::shared_ptr<Sigma2d>> &v, const Poly& r, bool imm) {
+    im = imm;
+    dim = 2;
+    setSigmas2D(v);
+    poly = r;
 }
+
+void Expression::setSigmas1D(const std::vector<std::shared_ptr<Sigma1d>>& sigmas) {
+    numSigmaX = 0;
+    numSigmaY = 0;
+    sigmaCoords.clear();
+    
+    auto tmp = sigmas;
+    std::sort(tmp.begin(), tmp.end(), [&](std::shared_ptr<Sigma1d> ptr1, std::shared_ptr<Sigma1d> ptr2) {
+        return ptr1->getC() < ptr2->getC();
+    });
+    for (int i = 0; i < (int)tmp.size(); i++) {
+        sigmaCoords.push_back(tmp[i]->getPoint());
+        if(tmp[i]->getC() == 1)
+            numSigmaX++;
+        else if(tmp[i]->getC() == 2)
+            numSigmaY++;
+    }
+}
+
+void Expression::setSigmas2D(const std::vector<std::shared_ptr<Sigma2d>>& sigmas) {
+    numSigmaX = 0;
+    numSigmaY = 0;
+    sigmaCoords.clear();
+    
+    auto tmp = sigmas;
+    std::sort(tmp.begin(), tmp.end(), [&](std::shared_ptr<Sigma2d> ptr1, std::shared_ptr<Sigma2d> ptr2) {
+        return ptr1->getC() < ptr2->getC();
+    });
+    for (int i = 0; i < (int)tmp.size(); i++) {
+        sigmaCoords.push_back(tmp[i]->getPoint1());
+        sigmaCoords.push_back(tmp[i]->getPoint2());
+        if(tmp[i]->getC() == 1)
+            numSigmaX++;
+        else if(tmp[i]->getC() == 2)
+            numSigmaY++;
+    }
+}
+
 //много вспомогательных функций
 std::vector<std::shared_ptr<Sigma>> Expression::getList() const
 {
-    return lst;
+    std::vector<std::shared_ptr<Sigma>> res;
+    if(dim == 1) {
+        for(size_t i = 0; i < sigmaCoords.size(); i++)
+            res.push_back(std::make_shared<Sigma1d>(sigmaCoords[i], (i < numSigmaX) ? 1 : ((i < numSigmaX + numSigmaY) ? 2 : 3)));
+    } else if(dim == 2) {
+        for(size_t i = 0; i < sigmaCoords.size(); i+=2)
+            res.push_back(std::make_shared<Sigma2d>(sigmaCoords[i], sigmaCoords[i + 1], (i / 2 < numSigmaX) ? 1 : ((i / 2 < numSigmaX + numSigmaY) ? 2 : 3)));
+    } else {
+        for(size_t i = 0; i < sigmaCoords.size(); i+=3)
+            res.push_back(std::make_shared<Sigma3d>(sigmaCoords[i], sigmaCoords[i + 1], sigmaCoords[i + 2], (i / 3 < numSigmaX) ? 1 : ((i / 3 < numSigmaX + numSigmaY) ? 2 : 3)));
+    }
+    return res;
 }
 Poly& Expression::getPoly()
 {
@@ -115,7 +156,7 @@ const Poly& Expression::getPoly() const
 }
 int Expression::getLength() const
 {
-    return (int)lst.size();
+    return (int)getList().size();
 }
 //самый главный оператор (коммутатор списка с элементов)
 void Expression::Commute(std::vector <Expression> &O1,  const Expression &O)
@@ -125,10 +166,8 @@ void Expression::Commute(std::vector <Expression> &O1,  const Expression &O)
     pol1 *= 2;
 
     //отсюда начинается сама коммутация в прицнипе тут осбо модно ничего не комментировать главное то как записывается результат в конце , там будет комментарий
-    std::vector<std::shared_ptr<Sigma>> lst1;
-    for (int i = 0; i < (int)O.lst.size(); i++){
-        lst1.push_back(O.lst[i]);
-    }
+    std::vector<std::shared_ptr<Sigma>> lst = getList();
+    std::vector<std::shared_ptr<Sigma>> lst1 = O.getList();
     for (int i = 0; i < (int)lst.size(); i++) {
         for (int j = 0; j < (int)lst1.size(); j++){
             if (lst[i]->getType()!=lst1[j]->getType()){
@@ -229,11 +268,8 @@ void Expression::Commute(std::vector <Expression> &O1,  const Expression &O)
                 }
 
                 // ??? создаем новое выражение
-                std::vector<std::shared_ptr<Sigma>> lstRes;
-                for(size_t k =0 ; k < lst3.size(); k++)
-                    lstRes.push_back(lst3[k]);
                 imm = imm % 4;
-                O1.emplace_back(lstRes, pol1 * ((imm == 2 || imm == 3) ? (-1) : 1), (imm % 2) == 1);
+                O1.emplace_back(lst3, pol1 * ((imm == 2 || imm == 3) ? (-1) : 1), (imm % 2) == 1);
             }
             if (s2){
                 bool b=false;
@@ -344,11 +380,8 @@ void Expression::Commute(std::vector <Expression> &O1,  const Expression &O)
                 }
 
                 // ??? создаем новое выражение
-                std::vector<std::shared_ptr<Sigma>> lstRes;
-                for(size_t k =0 ; k < lst3.size(); k++)
-                    lstRes.push_back(lst3[k]);
                 imm = imm % 4;
-                Expression n_exp(lstRes, pol1 * ((imm == 2 || imm == 3) ? (-1) : 1), (imm % 2) == 1); //это строчка с коэффициентов, таких утт создается много, все они в целом дают результат 
+                Expression n_exp(lst3, pol1 * ((imm == 2 || imm == 3) ? (-1) : 1), (imm % 2) == 1); //это строчка с коэффициентов, таких утт создается много, все они в целом дают результат 
                 
                 uint8_t Tl= n_exp.TotalLength();
                 uint8_t Mp= n_exp.MaxPoint();
@@ -395,10 +428,14 @@ void Expression::Commute(std::vector <Expression> &O1,  const Expression &O)
 
 uint8_t Expression::TotalLength()
 {
+    auto lst = getList();
+    
     return lst.size();
 }
 uint8_t Expression::MaxPoint()
 {
+    auto lst = getList();
+    
     uint8_t mp=0;
     for (int i = 0; i < (int)lst.size(); i++){
         auto s1 = std::dynamic_pointer_cast<Sigma1d>(lst[i]);
@@ -423,6 +460,8 @@ uint8_t Expression::MaxPoint()
 
 void Expression::MakeMbr(mpz_t mbr_x, mpz_t mbr_y, mpz_t mbr_z, uint8_t Mp)//функция которая создает три числа из строчки Паули
 {
+    auto lst = getList();
+    
     for (int i = 0; i < (int)lst.size(); i++){
         auto s2 = std::dynamic_pointer_cast<Sigma2d>(lst[i]);
         if (s2->getC()==1){
@@ -438,14 +477,16 @@ void Expression::MakeMbr(mpz_t mbr_x, mpz_t mbr_y, mpz_t mbr_z, uint8_t Mp)//ф�
 }
 
 
-bool Expression::operator==(const Expression &ex1) const
-{
-    if ((int)ex1.lst.size()!=(int)lst.size()){
+bool Expression::operator==(const Expression &ex1) const {
+    if (im != ex1.im || numSigmaX != ex1.numSigmaX || numSigmaY != ex1.numSigmaY)
         return false;
-    }
-    if (ex1.im!=im){
+
+    auto lst = getList();
+    auto lst1 = ex1.getList();
+    
+    if (lst1.size() != lst.size())
         return false;
-    }
+
     std::vector<bool> used2(lst.size(), false);
     for(int32_t i = 0; i < lst.size(); i++) {
         for(int32_t k = 0; k <= lst.size(); k++) {
@@ -453,13 +494,13 @@ bool Expression::operator==(const Expression &ex1) const
                 return false;
             if(used2[k])
                 continue;
-            if (lst[i]->getType()==ex1.lst[k]->getType()){
+            if (lst[i]->getType() == lst1[k]->getType()) {
                 auto s1 = std::dynamic_pointer_cast<Sigma1d>(lst[i]);
                 auto s2 = std::dynamic_pointer_cast<Sigma2d>(lst[i]);
                 auto s3 = std::dynamic_pointer_cast<Sigma3d>(lst[i]);
-                auto s11 = std::dynamic_pointer_cast<Sigma1d>(ex1.lst[k]);
-                auto s21 = std::dynamic_pointer_cast<Sigma2d>(ex1.lst[k]);
-                auto s31 = std::dynamic_pointer_cast<Sigma3d>(ex1.lst[k]);
+                auto s11 = std::dynamic_pointer_cast<Sigma1d>(lst1[k]);
+                auto s21 = std::dynamic_pointer_cast<Sigma2d>(lst1[k]);
+                auto s31 = std::dynamic_pointer_cast<Sigma3d>(lst1[k]);
                 if (s1){
                     if (*s11==*s1){
                         used2[k] = true;
@@ -535,6 +576,8 @@ bool prime(long int n){
 //}
 void Expression::print()
 {
+    auto lst = getList();
+    
     if (im==true){
         std::cout << "i*";
     }
@@ -550,17 +593,7 @@ void Expression::print()
     std::cout << std::endl;
 }
 
-
-Expression::~Expression()
-{
-   // for (int i = 0; i < (int)poly.size(); i++) {
-    //    delete poly[i];
-    //}
-}
-
 size_t ExpressionHasher::operator()(const Expression& expr) const {
-    size_t res = expr.lst.size() * 2 + (expr.im ? 1 : 0);
-
     auto sigmaCompare = [](const std::shared_ptr<Sigma>& s1_ptr, const std::shared_ptr<Sigma>& s2_ptr) {
         if(s1_ptr->getType() != s2_ptr->getType())
             return s1_ptr->getType() < s2_ptr->getType();
@@ -577,7 +610,8 @@ size_t ExpressionHasher::operator()(const Expression& expr) const {
         if (s3)
             return *s3 < *s31;
     };
-    auto lst2 = expr.lst;
+    auto lst2 = expr.getList();
+    size_t res = lst2.size() * 2 + (expr.im ? 1 : 0);
     std::sort(lst2.begin(), lst2.end(), sigmaCompare);
 
     for(size_t i = 0; i < lst2.size(); i++)

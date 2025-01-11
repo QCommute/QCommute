@@ -1,4 +1,4 @@
-#include "Sigma.h"
+#include "Monom.h"
 #include <cstdlib>
 #include <gmpxx.h>
 

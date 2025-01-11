@@ -9,8 +9,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <memory>
-#include "Expression.h"
-class Expression;
+
 //Базовый класс для множителей выражения
 class Sigma
 {

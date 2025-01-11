@@ -24,19 +24,24 @@ private:
     //коэффициент
     Poly poly;
     //Список сигм
-    std::vector<std::shared_ptr<Sigma>> lst;
+    std::vector<int> sigmaCoords;
+    uint32_t numSigmaX;
+    uint32_t numSigmaY;
+    int32_t dim; // 0 - размерность не определена (возникает при получении пустого списка из строки)
 
     bool im;
+
+    void setSigmas1D(const std::vector<std::shared_ptr<Sigma1d>>& sigmas);
+    void setSigmas2D(const std::vector<std::shared_ptr<Sigma2d>>& sigmas);
 public:
     Expression() = default;
     //Конструктор от строки
     Expression(const std::string& s);
     //Конструктор от списка множителей и коэффициента, который по умолчанию 1
-    Expression(const std::vector<std::shared_ptr<Sigma>> &v, const Poly& r, bool imm);
-    //Консруктор копирования о оператор присваивания, про них уже было в Base.h
-    Expression(const Expression &ex1);
+    Expression(const std::vector<std::shared_ptr<Sigma1d>> &v, const Poly& r, bool imm);
+    Expression(const std::vector<std::shared_ptr<Sigma2d>> &v, const Poly& r, bool imm);
+
     void Commute(std::vector <Expression> &O1,  const Expression &O);
-    Expression& operator=(const Expression &ex1);
     bool operator==(const Expression &ex1) const;
     int getLength() const;
     uint8_t TotalLength();
@@ -46,7 +51,6 @@ public:
     Poly& getPoly();
     const Poly& getPoly() const;
     void print();
-    ~Expression();
 };
 
 struct ExpressionHasher {
