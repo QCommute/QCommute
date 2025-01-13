@@ -32,14 +32,14 @@ private:
     bool im;
 
     void setSigmas1D(const std::vector<Sigma1d>& sigmas);
-    void setSigmas2D(const std::vector<std::shared_ptr<Sigma2d>>& sigmas);
+    void setSigmas2D(const std::vector<Sigma2d>& sigmas);
 public:
     Expression() = default;
     //Конструктор от строки
     Expression(const std::string& s);
     //Конструктор от списка множителей и коэффициента, который по умолчанию 1
     Expression(const std::vector<Sigma1d> &v, const Poly& r, bool imm);
-    Expression(const std::vector<std::shared_ptr<Sigma2d>> &v, const Poly& r, bool imm);
+    Expression(const std::vector<Sigma2d> &v, const Poly& r, bool imm);
 
     void Commute(std::vector <Expression> &O1,  const Expression &O);
     bool operator==(const Expression &ex1) const;

@@ -127,8 +127,7 @@ int Sigma2d::getPoint2()
 {
     return p2;
 }
-int Sigma2d::getC()
-{
+int Sigma2d::getC() const {
     return c;
 }
 void Sigma2d::setC(int c_)
@@ -375,18 +374,3 @@ bool Sigma3d::operator<(const Sigma3d& other) const {
     return std::tie(p1, p2, p3, c) < std::tie(other.p1, other.p2, other.p3, other.c);
 }
 
-void deepCopyBase(std::shared_ptr<Sigma> &to, std::shared_ptr<Sigma> from)
-{
-    int name = from->getType();
-    if (name == 1) {
-        to = std::make_shared<Sigma1d>(*std::dynamic_pointer_cast<Sigma1d>(from));
-    } else if (name == 2) {
-        to = std::make_shared<Sigma2d>(*std::dynamic_pointer_cast<Sigma2d>(from));
-    } else if (name == 3) {
-        to = std::make_shared<Sigma3d>(*std::dynamic_pointer_cast<Sigma3d>(from));
-    } else {
-        std::cout << "name = " << name << std::endl;
-        to = nullptr;
-        assert(0);
-    }
-}
