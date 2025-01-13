@@ -18,8 +18,7 @@ int Sigma1d::getPoint()
 {
     return p;
 }
-int Sigma1d::getC()
-{
+int Sigma1d::getC() const {
     return c;
 }
 void Sigma1d::setPoint(int p_)

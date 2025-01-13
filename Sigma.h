@@ -49,7 +49,7 @@ public:
     void print();
     int getType() const override;
     int getPoint();
-    int getC();
+    int getC() const;
     void setC(int c_);
     void setPoint(int p_);
     size_t getHash() override;

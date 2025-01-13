@@ -67,9 +67,9 @@ Expression::Expression(const std::string& s)
     }
     
     if(dim == 1) {
-        std::vector<std::shared_ptr<Sigma1d>> lst2;
+        std::vector<Sigma1d> lst2;
         for(size_t i = 0; i < lst.size(); i++)
-            lst2.push_back(std::dynamic_pointer_cast<Sigma1d>(lst[i]));
+            lst2.push_back(*std::dynamic_pointer_cast<Sigma1d>(lst[i]));
         setSigmas1D(lst2);
     } else if(dim == 2) {
         std::vector<std::shared_ptr<Sigma2d>> lst2;
@@ -79,7 +79,7 @@ Expression::Expression(const std::string& s)
     }
 }
 
-Expression::Expression(const std::vector<std::shared_ptr<Sigma1d>> &v, const Poly& r, bool imm) {
+Expression::Expression(const std::vector<Sigma1d> &v, const Poly& r, bool imm) {
     im = imm;
     dim = 1;
     setSigmas1D(v);
@@ -93,20 +93,20 @@ Expression::Expression(const std::vector<std::shared_ptr<Sigma2d>> &v, const Pol
     poly = r;
 }
 
-void Expression::setSigmas1D(const std::vector<std::shared_ptr<Sigma1d>>& sigmas) {
+void Expression::setSigmas1D(const std::vector<Sigma1d>& sigmas) {
     numSigmaX = 0;
     numSigmaY = 0;
     sigmaCoords.clear();
     
     auto tmp = sigmas;
-    std::sort(tmp.begin(), tmp.end(), [&](std::shared_ptr<Sigma1d> ptr1, std::shared_ptr<Sigma1d> ptr2) {
-        return ptr1->getC() < ptr2->getC();
+    std::sort(tmp.begin(), tmp.end(), [&](const Sigma1d& ptr1, const Sigma1d& ptr2) {
+        return ptr1.getC() < ptr2.getC();
     });
     for (int i = 0; i < (int)tmp.size(); i++) {
-        sigmaCoords.push_back(tmp[i]->getPoint());
-        if(tmp[i]->getC() == 1)
+        sigmaCoords.push_back(tmp[i].getPoint());
+        if(tmp[i].getC() == 1)
             numSigmaX++;
-        else if(tmp[i]->getC() == 2)
+        else if(tmp[i].getC() == 2)
             numSigmaY++;
     }
 }
@@ -197,16 +197,14 @@ void Expression::Commute(std::vector <Expression> &O1,  const Expression &O)
                     nc=nc*(-1);
                 }
                 int pd=s11->getPoint()-s1->getPoint();
-                std::vector<std::shared_ptr<Sigma1d>> lst3;
+                std::vector<Sigma1d> lst3;
                 for (int k = 0; k < (int)lst.size(); k++) {
-                    std::shared_ptr<Sigma> tt;
-                    deepCopyBase(tt, lst[k]);
-                    auto t = std::dynamic_pointer_cast<Sigma1d>(tt);
+                    Sigma1d t = *std::dynamic_pointer_cast<Sigma1d>(lst[k]);
                     if (k==i){
-                        t->setC(nc);
+                        t.setC(nc);
                     }
                     if (pd>0){
-                        t->setPoint(t->getPoint()+pd);
+                        t.setPoint(t.getPoint()+pd);
                     }
                     lst3.push_back(t);
                 }
@@ -214,34 +212,32 @@ void Expression::Commute(std::vector <Expression> &O1,  const Expression &O)
                     if (k==j){
                         continue;
                     }
-                    std::shared_ptr<Sigma> tt;
-                    deepCopyBase(tt, lst1[k]);
-                    auto t = std::dynamic_pointer_cast<Sigma1d>(tt);
+                    Sigma1d t = *std::dynamic_pointer_cast<Sigma1d>(lst1[k]);
                     if (pd<0){
-                        t->setPoint(t->getPoint()-pd);
+                        t.setPoint(t.getPoint()-pd);
                     }
                     lst3.push_back(t);
                 }
 
                 // ??? схлопываем сигмы, попавшие в одну точку
                 int nn=0;
-                std::sort(lst3.begin(), lst3.end(), [](const std::shared_ptr<Sigma1d>& s1, const std::shared_ptr<Sigma1d>& s2) {
-                    return (*s1) < (*s2);
+                std::sort(lst3.begin(), lst3.end(), [](const Sigma1d& s1, const Sigma1d& s2) {
+                    return s1 < s2;
                 });
-                std::vector<std::shared_ptr<Sigma1d>> lst32;
+                std::vector<Sigma1d> lst32;
                 for(size_t k = 0; k < lst3.size(); k++) {
-                    if(!lst32.empty() && lst32.back()->getPoint() == lst3[k]->getPoint()) {
-                        if(lst32.back()->getC() == lst3[k]->getC())
+                    if(!lst32.empty() && lst32.back().getPoint() == lst3[k].getPoint()) {
+                        if(lst32.back().getC() == lst3[k].getC())
                             lst32.pop_back();
                         else {
                             nn++;
-                            int nc2 = LeviChivita(lst32.back()->getC(), lst3[k]->getC());
+                            int nc2 = LeviChivita(lst32.back().getC(), lst3[k].getC());
                             imm++;
                             if (nc2 < 0) {
                                 nc2 = -nc2;
                                 imm += 2;
                             }
-                            lst32.back()->setC(nc2);
+                            lst32.back().setC(nc2);
                         }
                     } else
                         lst32.push_back(lst3[k]);
@@ -255,16 +251,14 @@ void Expression::Commute(std::vector <Expression> &O1,  const Expression &O)
                 int mp=0;
                 for(size_t k = 0; k < lst3.size(); k++) {
                     if (mp == 0){
-                        mp = lst3[k]->getPoint();
+                        mp = lst3[k].getPoint();
                     }
                     else
-                        mp = std::min(mp, lst3[k]->getPoint());
+                        mp = std::min(mp, lst3[k].getPoint());
                 }
                 if (mp>1){
-                    for (int k = 0; k < (int)lst3.size(); k++) {
-                        auto t = lst3[k];
-                        t->setPoint(t->getPoint()-mp+1);
-                    }
+                    for (int k = 0; k < (int)lst3.size(); k++)
+                        lst3[k].setPoint(lst3[k].getPoint()-mp+1);
                 }
 
                 // ??? создаем новое выражение
