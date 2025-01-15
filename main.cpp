@@ -155,7 +155,7 @@ main(int argc, char** argv)
         Node** indices = new Node*[tableSize];
         for(size_t i = 0; i < tableSize; i++)
             indices[i] = nullptr;
-        std::mutex* indexMutexes = new std::mutex[tableSize];
+        std::mutex* indexMutexes = new std::mutex[(tableSize + 15) / 16];
         for (size_t i = 0; i < H.size(); i++) {
             std::queue<size_t> tasks;
             for (size_t j = 0; j < O.size(); j++)
@@ -179,7 +179,7 @@ main(int argc, char** argv)
                         
                         for(size_t k = 0; k < cur.size(); k++) {
                             size_t hash = ExpressionHasher()(cur[k]);
-                            std::lock_guard<std::mutex> guard(indexMutexes[hash % tableSize]);
+                            std::lock_guard<std::mutex> guard(indexMutexes[(hash % tableSize) / 16]);
                             Node* cur_node = indices[hash % tableSize];
                             bool found = false;
                             while(cur_node != nullptr) {
