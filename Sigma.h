@@ -48,7 +48,7 @@ public:
     //Вывод
     void print();
     int getType() const override;
-    int getPoint();
+    int getPoint() const;
     int getC() const;
     void setC(int c_);
     void setPoint(int p_);
@@ -79,8 +79,8 @@ public:
     //Вывод
     void print();
     int getType() const override;
-    int getPoint1();
-    int getPoint2();
+    int getPoint1() const;
+    int getPoint2() const;
     int getC() const;
     void setC(int c_);
     void setPoint1(int p1_);

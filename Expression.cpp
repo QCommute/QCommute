@@ -100,7 +100,9 @@ void Expression::setSigmas1D(const std::vector<Sigma1d>& sigmas) {
     
     auto tmp = sigmas;
     std::sort(tmp.begin(), tmp.end(), [&](const Sigma1d& ptr1, const Sigma1d& ptr2) {
-        return ptr1.getC() < ptr2.getC();
+        if(ptr1.getC() != ptr2.getC())
+            return ptr1.getC() < ptr2.getC();
+        return ptr1.getPoint() < ptr2.getPoint();
     });
     for (int i = 0; i < (int)tmp.size(); i++) {
         sigmaCoords.push_back(tmp[i].getPoint());
@@ -118,7 +120,11 @@ void Expression::setSigmas2D(const std::vector<Sigma2d>& sigmas) {
     
     auto tmp = sigmas;
     std::sort(tmp.begin(), tmp.end(), [&](const Sigma2d& ptr1, const Sigma2d& ptr2) {
-        return ptr1.getC() < ptr2.getC();
+        if(ptr1.getC() != ptr2.getC())
+            return ptr1.getC() < ptr2.getC();
+        if(ptr1.getPoint1() != ptr2.getPoint1())
+            return ptr1.getPoint1() < ptr2.getPoint1();
+        return ptr1.getPoint2() < ptr2.getPoint2();
     });
     for (int i = 0; i < (int)tmp.size(); i++) {
         sigmaCoords.push_back(tmp[i].getPoint1());
@@ -467,48 +473,15 @@ bool Expression::operator==(const Expression &ex1) const {
     if (im != ex1.im || numSigmaX != ex1.numSigmaX || numSigmaY != ex1.numSigmaY)
         return false;
 
-    auto lst = getList();
-    auto lst1 = ex1.getList();
-    
-    if (lst1.size() != lst.size())
-        return false;
+    if(sigmaCoords.empty())
+        return ex1.sigmaCoords.empty();
+    if(ex1.sigmaCoords.empty())
+        return sigmaCoords.empty();
 
-    std::vector<bool> used2(lst.size(), false);
-    for(int32_t i = 0; i < lst.size(); i++) {
-        for(int32_t k = 0; k <= lst.size(); k++) {
-            if(k == lst.size())
-                return false;
-            if(used2[k])
-                continue;
-            if (lst[i]->getType() == lst1[k]->getType()) {
-                auto s1 = std::dynamic_pointer_cast<Sigma1d>(lst[i]);
-                auto s2 = std::dynamic_pointer_cast<Sigma2d>(lst[i]);
-                auto s3 = std::dynamic_pointer_cast<Sigma3d>(lst[i]);
-                auto s11 = std::dynamic_pointer_cast<Sigma1d>(lst1[k]);
-                auto s21 = std::dynamic_pointer_cast<Sigma2d>(lst1[k]);
-                auto s31 = std::dynamic_pointer_cast<Sigma3d>(lst1[k]);
-                if (s1){
-                    if (*s11==*s1){
-                        used2[k] = true;
-                        break;
-                    }
-                }
-                if (s2){
-                    if (*s21==*s2){
-                        used2[k] = true;
-                        break;
-                    }
-                }
-                if (s3){
-                    if (*s31==*s3){
-                        used2[k] = true;
-                        break;
-                    }
-                }
-            }
-        }
-    }
-    return true;
+    if(dim != ex1.dim)
+        return false;
+    // Сигмы хранятся в отсортированном порядке, поэтому достаточно сравнить вектора координат
+    return sigmaCoords == ex1.sigmaCoords;
 }
 
 int LeviChivita(int i, int j){

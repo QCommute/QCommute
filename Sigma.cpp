@@ -14,8 +14,7 @@ extern int indcount;
 extern int lorindcount;
 
  //описание класса Sigma тут особо комментировать нечего, разве что тут фактически три класса для одномерной, двумерной или трехмерной задачи
-int Sigma1d::getPoint()
-{
+int Sigma1d::getPoint() const {
     return p;
 }
 int Sigma1d::getC() const {
@@ -119,12 +118,10 @@ bool Sigma1d::operator<(const Sigma1d& other) const {
     return std::tie(p, c) < std::tie(other.p, other.c);
 }
 
-int Sigma2d::getPoint1()
-{
+int Sigma2d::getPoint1() const {
     return p1;
 }
-int Sigma2d::getPoint2()
-{
+int Sigma2d::getPoint2() const {
     return p2;
 }
 int Sigma2d::getC() const {
