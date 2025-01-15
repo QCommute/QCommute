@@ -103,8 +103,9 @@ main(int argc, char** argv)
     auto start_time = Clock::now();//просто часы чтобы мерить время исполнения
     setlocale(LC_ALL, "");
     std::vector <Expression> H;//Переменная Гамильтониана
-    std::vector <Expression> O;//Переменная Наблюдаемой
-    std::vector <int> I;
+    Node* O = nullptr;//Переменная Наблюдаемой
+    size_t O_size = 0;
+    
     std::ifstream file(argv[1], std::ifstream::in);//огткрфваем файл в котором содерижится наблюдаемая и гамильтониан
     std::string str;
     std::getline(file, str);
@@ -128,7 +129,8 @@ main(int argc, char** argv)
     }
     while(str!="n:") {
         Expression t(str);//Создаем из строчки выражение для наблюдаемой
-        O.push_back(t);//и помещаем в список
+        O = new Node(std::move(t), O);//и помещаем в список
+        O_size++;
         std::getline(file, str);
     }
     std::getline(file, str);
@@ -151,31 +153,33 @@ main(int argc, char** argv)
         } 
 
         auto time2 = Clock::now();
-        size_t tableSize = H.size() * O.size();
+        size_t tableSize = H.size() * O_size;
         Node** indices = new Node*[tableSize];
         for(size_t i = 0; i < tableSize; i++)
             indices[i] = nullptr;
         std::mutex* indexMutexes = new std::mutex[(tableSize + 15) / 16];
-        for (size_t i = 0; i < H.size(); i++) {
-            std::queue<size_t> tasks;
-            for (size_t j = 0; j < O.size(); j++)
-                tasks.push(j);
+        std::cerr << O_size << " " << tableSize << "\n";
+        //for (size_t i = 0; i < H.size(); i++) {
+            std::queue<Node*> tasks;
+            for(Node* cur = O; cur != nullptr; cur = cur->next)
+                tasks.push(cur);
             std::mutex taskMutex;
 
             std::vector<std::thread> threads;
             size_t num_threads = std::thread::hardware_concurrency();
             for(size_t tt = 0; tt < num_threads; tt++) {
-                threads.emplace_back([&tasks, &taskMutex, indices, tableSize, indexMutexes, &O, &H, i]() {
+                threads.emplace_back([&tasks, &taskMutex, indices, tableSize, indexMutexes, &O, &H]() {
                     while(true) {
                         std::unique_lock<std::mutex> lock(taskMutex);
                         if(tasks.empty())
                             return;
-                        size_t j = tasks.front();
+                        Node* O_cur = tasks.front();
                         tasks.pop();
                         lock.unlock();
                         
                         std::vector<Expression> cur;
-                        H[i].Commute(cur, O[j]); //коммутируем все салгаемые с гамильтонанном.
+                        for (size_t i = 0; i < H.size(); i++)
+                            H[i].Commute(cur, O_cur->expr); //коммутируем все салгаемые с гамильтонанном.
                         
                         for(size_t k = 0; k < cur.size(); k++) {
                             size_t hash = ExpressionHasher()(cur[k]);
@@ -194,36 +198,42 @@ main(int argc, char** argv)
                                 indices[hash % tableSize] = new Node(std::move(cur[k]), indices[hash % tableSize]);
                             }
                         }
+                        delete O_cur;
                     }
                 });
             }
             for(size_t j = 0; j < threads.size(); j++)
                 threads[j].join();
-        }
+        //}
         delete[] indexMutexes;
         auto time3 = Clock::now();
         std::cerr << "Подсчет коммутаторов и приведение подобных: " << (std::chrono::duration_cast<std::chrono::microseconds>(time3 - time2).count())/1000000.0 << " сек" << std::endl;
         
-        O.clear();
+        Node* O1 = nullptr;
+        O_size = 0;
         for(size_t i = 0; i < tableSize; i++) {
             Node* cur_node = indices[i];
             while(cur_node != nullptr) {
-                if(!cur_node->expr.getPoly().isZero())
-                    O.push_back(std::move(cur_node->expr));
                 Node* next_node = cur_node->next;
-                delete cur_node;
+                if(!cur_node->expr.getPoly().isZero()) {
+                    cur_node->next = O1;
+                    O1 = cur_node;
+                    O_size++;
+                } else
+                    delete cur_node;
                 cur_node = next_node;
             }
         }
         delete[] indices;
+        O = O1;
     
         directoryPath.erase(directoryPath.size()-1);
         std::cerr << std::endl;
     }
     
     //вывод результата, пока он делается просто на экран
-    for (size_t i = 0; i < O.size(); i++)
-        O[i].print();
+    for(Node* cur = O; cur != nullptr; cur = cur->next)
+        cur->expr.print();
 
 auto time1 = Clock::now();
 std::cerr << "Вычисление заняло "<< (std::chrono::duration_cast<std::chrono::microseconds>(time1 - start_time).count())/1000000.0 << " сек" << std::endl;
