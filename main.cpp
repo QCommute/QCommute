@@ -158,53 +158,52 @@ main(int argc, char** argv)
         for(size_t i = 0; i < tableSize; i++)
             indices[i] = nullptr;
         std::mutex* indexMutexes = new std::mutex[(tableSize + 15) / 16];
-        std::cerr << O_size << " " << tableSize << "\n";
-        //for (size_t i = 0; i < H.size(); i++) {
-            std::queue<Node*> tasks;
-            for(Node* cur = O; cur != nullptr; cur = cur->next)
-                tasks.push(cur);
-            std::mutex taskMutex;
 
-            std::vector<std::thread> threads;
-            size_t num_threads = std::thread::hardware_concurrency();
-            for(size_t tt = 0; tt < num_threads; tt++) {
-                threads.emplace_back([&tasks, &taskMutex, indices, tableSize, indexMutexes, &O, &H]() {
-                    while(true) {
-                        std::unique_lock<std::mutex> lock(taskMutex);
-                        if(tasks.empty())
-                            return;
-                        Node* O_cur = tasks.front();
-                        tasks.pop();
-                        lock.unlock();
-                        
-                        std::vector<Expression> cur;
-                        for (size_t i = 0; i < H.size(); i++)
-                            H[i].Commute(cur, O_cur->expr); //коммутируем все салгаемые с гамильтонанном.
-                        
-                        for(size_t k = 0; k < cur.size(); k++) {
-                            size_t hash = ExpressionHasher()(cur[k]);
-                            std::lock_guard<std::mutex> guard(indexMutexes[(hash % tableSize) / 16]);
-                            Node* cur_node = indices[hash % tableSize];
-                            bool found = false;
-                            while(cur_node != nullptr) {
-                                if(cur_node->expr == cur[k]) {
-                                    cur_node->expr.getPoly() += cur[k].getPoly();
-                                    found = true;
-                                    break;
-                                }
-                                cur_node = cur_node->next;
+        std::queue<Node*> tasks;
+        for(Node* cur = O; cur != nullptr; cur = cur->next)
+            tasks.push(cur);
+        std::mutex taskMutex;
+        
+        std::vector<std::thread> threads;
+        size_t num_threads = std::thread::hardware_concurrency();
+        for(size_t tt = 0; tt < num_threads; tt++) {
+            threads.emplace_back([&tasks, &taskMutex, indices, tableSize, indexMutexes, &O, &H]() {
+                while(true) {
+                    std::unique_lock<std::mutex> lock(taskMutex);
+                    if(tasks.empty())
+                        return;
+                    Node* O_cur = tasks.front();
+                    tasks.pop();
+                    lock.unlock();
+                    
+                    std::vector<Expression> cur;
+                    for (size_t i = 0; i < H.size(); i++)
+                        H[i].Commute(cur, O_cur->expr); //коммутируем все салгаемые с гамильтонанном.
+                    
+                    for(size_t k = 0; k < cur.size(); k++) {
+                        size_t hash = ExpressionHasher()(cur[k]);
+                        std::lock_guard<std::mutex> guard(indexMutexes[(hash % tableSize) / 16]);
+                        Node* cur_node = indices[hash % tableSize];
+                        bool found = false;
+                        while(cur_node != nullptr) {
+                            if(cur_node->expr == cur[k]) {
+                                cur_node->expr.getPoly() += cur[k].getPoly();
+                                found = true;
+                                break;
                             }
-                            if(!found) {
-                                indices[hash % tableSize] = new Node(std::move(cur[k]), indices[hash % tableSize]);
-                            }
+                            cur_node = cur_node->next;
                         }
-                        delete O_cur;
+                        if(!found) {
+                            indices[hash % tableSize] = new Node(std::move(cur[k]), indices[hash % tableSize]);
+                        }
                     }
-                });
-            }
-            for(size_t j = 0; j < threads.size(); j++)
-                threads[j].join();
-        //}
+                    delete O_cur;
+                }
+            });
+        }
+        for(size_t j = 0; j < threads.size(); j++)
+            threads[j].join();
+        
         delete[] indexMutexes;
         auto time3 = Clock::now();
         std::cerr << "Подсчет коммутаторов и приведение подобных: " << (std::chrono::duration_cast<std::chrono::microseconds>(time3 - time2).count())/1000000.0 << " сек" << std::endl;
