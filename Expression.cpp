@@ -553,27 +553,11 @@ void Expression::print()
 }
 
 size_t ExpressionHasher::operator()(const Expression& expr) const {
-    auto sigmaCompare = [](const std::shared_ptr<Sigma>& s1_ptr, const std::shared_ptr<Sigma>& s2_ptr) {
-        if(s1_ptr->getType() != s2_ptr->getType())
-            return s1_ptr->getType() < s2_ptr->getType();
-        auto s1 = std::dynamic_pointer_cast<Sigma1d>(s1_ptr);
-        auto s2 = std::dynamic_pointer_cast<Sigma2d>(s1_ptr);
-        auto s3 = std::dynamic_pointer_cast<Sigma3d>(s1_ptr);
-        auto s11 = std::dynamic_pointer_cast<Sigma1d>(s2_ptr);
-        auto s21 = std::dynamic_pointer_cast<Sigma2d>(s2_ptr);
-        auto s31 = std::dynamic_pointer_cast<Sigma3d>(s2_ptr);
-        if (s1)
-            return *s1 < *s11;
-        if (s2)
-            return *s2 < *s21;
-        if (s3)
-            return *s3 < *s31;
-    };
-    auto lst2 = expr.getList();
-    size_t res = lst2.size() * 2 + (expr.im ? 1 : 0);
-    std::sort(lst2.begin(), lst2.end(), sigmaCompare);
-
-    for(size_t i = 0; i < lst2.size(); i++)
-        res = res * 0x159fa76bc + lst2[i]->getHash();
+    if(expr.sigmaCoords.empty())
+        return expr.im ? 1 : 0;
+    size_t res = expr.dim * 2 + (expr.im ? 1 : 0);
+    for(size_t i = 0; i < expr.sigmaCoords.size(); i++)
+        res = res * 0x159fa76bc + expr.sigmaCoords[i] + 1;
     return res;
 }
+
