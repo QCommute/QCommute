@@ -26,25 +26,11 @@
 #include <unordered_map>
 #include <set>
 #include <unordered_set>
-#include <queue>
+
 int indcount;
 int lorindcount;
 std::string directoryPath;
 typedef std::chrono::high_resolution_clock Clock;
-
-using namespace std;
-
-int raiseToPow(int x, int power)
-{
-    int result;
-    int i;
-    result =1;
-    for (i=1; i<=power;i++)
-    {
-        result = result*x;
-    }
-    return(result);
-}
 
 struct Node {
     Expression expr;
@@ -137,10 +123,7 @@ main(int argc, char** argv)
     if (str=="n:"){
         std::getline(file, str);
     }
-    int n=0;
-    for (int i = 0; i < (int)str.length(); i++) {
-        n+=(str[i]-'0')*raiseToPow(10,(int)str.length()-i-1);//порядок разложения (сколько вложенных коммутаторов нужно посчитать)
-    }
+    int n = std::stoi(str);
     file.close();
     std::cerr << "Файл считан корректно"<< std::endl;
 
