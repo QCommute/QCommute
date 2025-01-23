@@ -159,21 +159,19 @@ main(int argc, char** argv)
             indices[i] = nullptr;
         std::mutex* indexMutexes = new std::mutex[(tableSize + 15) / 16];
 
-        std::queue<Node*> tasks;
-        for(Node* cur = O; cur != nullptr; cur = cur->next)
-            tasks.push(cur);
+        Node* nextTask = O;
         std::mutex taskMutex;
         
         std::vector<std::thread> threads;
         size_t num_threads = std::thread::hardware_concurrency();
         for(size_t tt = 0; tt < num_threads; tt++) {
-            threads.emplace_back([&tasks, &taskMutex, indices, tableSize, indexMutexes, &O, &H]() {
+            threads.emplace_back([&nextTask, &taskMutex, indices, tableSize, indexMutexes, &O, &H]() {
                 while(true) {
                     std::unique_lock<std::mutex> lock(taskMutex);
-                    if(tasks.empty())
+                    if(nextTask == nullptr)
                         return;
-                    Node* O_cur = tasks.front();
-                    tasks.pop();
+                    Node* O_cur = nextTask;
+                    nextTask = nextTask->next;
                     lock.unlock();
                     
                     std::vector<Expression> cur;
