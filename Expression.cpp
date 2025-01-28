@@ -164,28 +164,30 @@ int Expression::getLength() const
 {
     return (int)getList().size();
 }
+
 //самый главный оператор (коммутатор списка с элементов)
 void Expression::Commute(std::vector <Expression> &O1,  const Expression &O)
 {
+    if(sigmaCoords.empty() || O.sigmaCoords.empty())
+        return;
+    assert(dim == O.dim);
+
     //работа с полиномами, а именно их умножение
     Poly pol1 = poly * O.poly;
     pol1 *= 2;
-
+    
     //отсюда начинается сама коммутация в прицнипе тут осбо модно ничего не комментировать главное то как записывается результат в конце , там будет комментарий
-    std::vector<std::shared_ptr<Sigma>> lst = getList();
-    std::vector<std::shared_ptr<Sigma>> lst1 = O.getList();
-    for (int i = 0; i < (int)lst.size(); i++) {
-        for (int j = 0; j < (int)lst1.size(); j++){
-            if (lst[i]->getType()!=lst1[j]->getType()){
-                continue;
-            }
-            auto s1 = std::dynamic_pointer_cast<Sigma1d>(lst[i]);
-            auto s2 = std::dynamic_pointer_cast<Sigma2d>(lst[i]);
-            auto s3 = std::dynamic_pointer_cast<Sigma3d>(lst[i]);
-            auto s11 = std::dynamic_pointer_cast<Sigma1d>(lst1[j]);
-            auto s21 = std::dynamic_pointer_cast<Sigma2d>(lst1[j]);
-            auto s31 = std::dynamic_pointer_cast<Sigma3d>(lst1[j]);
-            if (s1) {
+    if(dim == 1) {
+        std::vector<std::shared_ptr<Sigma>> lst = getList();
+        std::vector<std::shared_ptr<Sigma>> lst1 = O.getList();
+        for (int i = 0; i < (int)lst.size(); i++) {
+            for (int j = 0; j < (int)lst1.size(); j++){
+                if (lst[i]->getType()!=lst1[j]->getType()){
+                    continue;
+                }
+                auto s1 = std::dynamic_pointer_cast<Sigma1d>(lst[i]);
+                auto s11 = std::dynamic_pointer_cast<Sigma1d>(lst1[j]);
+
                 if (s1->getC()==s11->getC()){
                     continue;
                 }
@@ -254,25 +256,32 @@ void Expression::Commute(std::vector <Expression> &O1,  const Expression &O)
                 }
 
                 // ??? сдвигаем минимум в точку 1
-                int mp=0;
-                for(size_t k = 0; k < lst3.size(); k++) {
-                    if (mp == 0){
-                        mp = lst3[k].getPoint();
-                    }
-                    else
+                if(!lst3.empty()) {
+                    int mp = lst3[0].getPoint();
+                    for(size_t k = 1; k < lst3.size(); k++)
                         mp = std::min(mp, lst3[k].getPoint());
-                }
-                if (mp>1){
-                    for (int k = 0; k < (int)lst3.size(); k++)
-                        lst3[k].setPoint(lst3[k].getPoint()-mp+1);
+
+                    int delta = (mp > 1) ? (-mp + 1) : 0;
+                    for(size_t k = 0; k < lst3.size(); k++)
+                        lst3[k].setPoint(lst3[k].getPoint() + delta);
                 }
 
                 // ??? создаем новое выражение
                 imm = imm % 4;
                 O1.emplace_back(lst3, pol1 * ((imm == 2 || imm == 3) ? (-1) : 1), (imm % 2) == 1);
             }
-            if (s2){
-                bool b=false;
+        }
+    } else if(dim == 2) {
+        std::vector<std::shared_ptr<Sigma>> lst = getList();
+        std::vector<std::shared_ptr<Sigma>> lst1 = O.getList();
+        for (int i = 0; i < (int)lst.size(); i++) {
+            for (int j = 0; j < (int)lst1.size(); j++){
+                if (lst[i]->getType()!=lst1[j]->getType()){
+                    continue;
+                }
+                auto s2 = std::dynamic_pointer_cast<Sigma2d>(lst[i]);
+                auto s21 = std::dynamic_pointer_cast<Sigma2d>(lst1[j]);
+                
                 if (s2->getC()==s21->getC()){
                     continue;
                 }
@@ -348,33 +357,26 @@ void Expression::Commute(std::vector <Expression> &O1,  const Expression &O)
                 }
 
                 // ??? сдвигаем минимум в точку (1, 1)
-                int mp1=0;
-                int mp2=0;
-                for(size_t k = 0; k < lst3.size(); k++) {
-                    if (mp1==0){
-                        mp1=lst3[k].getPoint1();
-                    }
-                    else
+                if(!lst3.empty()) {
+                    int mp1 = lst3[0].getPoint1();
+                    int mp2 = lst3[0].getPoint2();
+                    for(size_t k = 1; k < lst3.size(); k++) {
                         mp1 = std::min(mp1, lst3[k].getPoint1());
-                    if (mp2==0){
-                        mp2=lst3[k].getPoint2();
-                    }
-                    else
                         mp2 = std::min(mp2, lst3[k].getPoint2());
-                }
-                if (mp1>1){
-                    for (int k = 0; k < (int)lst3.size(); k++)
-                        lst3[k].setPoint1(lst3[k].getPoint1()-mp1+1);
-                }
-                if (mp2>1){
-                    for (int k = 0; k < (int)lst3.size(); k++)
-                        lst3[k].setPoint2(lst3[k].getPoint2()-mp2+1);
+                    }
+
+                    int delta1 = (mp1 > 1) ? (-mp1 + 1) : 0;
+                    int delta2 = (mp2 > 1) ? (-mp2 + 1) : 0;
+                    for(size_t k = 0; k < lst3.size(); k++) {
+                        lst3[k].setPoint1(lst3[k].getPoint1() + delta1);
+                        lst3[k].setPoint2(lst3[k].getPoint2() + delta2);
+                    }
                 }
 
                 // ??? создаем новое выражение
                 imm = imm % 4;
                 Expression n_exp(lst3, pol1 * ((imm == 2 || imm == 3) ? (-1) : 1), (imm % 2) == 1); //это строчка с коэффициентов, таких утт создается много, все они в целом дают результат 
-                
+
                 uint8_t Tl= n_exp.TotalLength();
                 uint8_t Mp= n_exp.MaxPoint();
                 mpz_t mbr_x;
@@ -397,7 +399,7 @@ void Expression::Commute(std::vector <Expression> &O1,  const Expression &O)
                 mpz_export(buffery, nullptr, 1, 1, 0, 0, mbr_y);
                 mpz_export(bufferz, nullptr, 1, 1, 0, 0, mbr_z);
                 #pragma omp critical
-                 {
+                {
                     //cout << mbr_x<< "ddwdw" << mbr_y << endl;
                     //создаем файл с соответвующим названием и помещаем в него эти числа
                     std::ofstream ofs(directoryPath+"/"+std::to_string(Mp)+"_"+std::to_string(Tl)+".bin", std::ios::binary);
@@ -409,12 +411,12 @@ void Expression::Commute(std::vector <Expression> &O1,  const Expression &O)
                     ofs.write(bufferz, numBytesx);
                     ofs.close(); //пока я эти файлы не использую, не успел ещё это сделать, просто в них скалдываем, еще нужно скалдывать в файлы полиномы, пока тоже не реализовано
                     O1.push_back(n_exp); //так что пока кладем в опретивную память и создаем новый список
-                 }
+                }
                 delete[] bufferx;
                 delete[] buffery;
                 delete[] bufferz;
-             }
-         }
+            }
+        }
     }
 }
 
