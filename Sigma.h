@@ -23,7 +23,6 @@ public:
     virtual int getType() const = 0;
     //virtual int getVal()=0;
     //virtual void setVal(int val_)=0;
-    virtual size_t getHash() = 0;
     //Деструктор, в данном случае важно что он виртуальный, чтобы для наследников запускались их деструкторы, а не только деструктор базового класса
     virtual ~Sigma() = default;
 };
@@ -52,7 +51,6 @@ public:
     int getC() const;
     void setC(int c_);
     void setPoint(int p_);
-    size_t getHash() override;
     bool operator<(const Sigma1d& other) const;
     ~Sigma1d() override = default;
 };
@@ -85,7 +83,6 @@ public:
     void setC(int c_);
     void setPoint1(int p1_);
     void setPoint2(int p2_);
-    size_t getHash() override;
     bool operator<(const Sigma2d& other) const;
     ~Sigma2d() override = default;
 };
@@ -114,7 +111,6 @@ public:
     int getType() const override;
     int getPoint1();
     void setPoint(int p1_, int p2_, int p3_);
-    size_t getHash() override;
     bool operator<(const Sigma3d& other) const;
     ~Sigma3d() override = default;
 };
