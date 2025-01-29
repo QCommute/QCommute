@@ -284,7 +284,10 @@ void Expression::Commute(std::vector <Expression> &O1,  const Expression &O)
 
                 // ??? создаем новое выражение
                 imm = imm % 4;
-                O1.emplace_back(lst3, pol1 * ((imm == 2 || imm == 3) ? (-1) : 1), (imm % 2) == 1);
+                if(imm == 2 || imm == 3)
+                    O1.emplace_back(lst3, pol1 * (-1), (imm % 2) == 1);
+                else
+                    O1.emplace_back(lst3, pol1, (imm % 2) == 1);
             }
         }
     } else if(dim == 2) {
