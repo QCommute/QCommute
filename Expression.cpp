@@ -152,6 +152,18 @@ std::vector<std::shared_ptr<Sigma>> Expression::getList() const
     }
     return res;
 }
+
+std::vector<Sigma1d> Expression::getList1D() const {
+    if(dim == 0)
+        return {};
+    assert(dim == 1);
+    
+    std::vector<Sigma1d> res;
+    for(size_t i = 0; i < sigmaCoords.size(); i++)
+        res.emplace_back(sigmaCoords[i], (i < numSigmaX) ? 1 : ((i < numSigmaX + numSigmaY) ? 2 : 3));
+    return res;
+}
+
 Poly& Expression::getPoly()
 {
     return poly;
@@ -178,21 +190,27 @@ void Expression::Commute(std::vector <Expression> &O1,  const Expression &O)
     
     //отсюда начинается сама коммутация в прицнипе тут осбо модно ничего не комментировать главное то как записывается результат в конце , там будет комментарий
     if(dim == 1) {
-        std::vector<std::shared_ptr<Sigma>> lst = getList();
-        std::vector<std::shared_ptr<Sigma>> lst1 = O.getList();
+        std::vector<Sigma1d> lst = getList1D();
+        std::sort(lst.begin(), lst.end(), [&](const Sigma1d& s1, const Sigma1d& s2) {
+            return s1.getPoint() < s2.getPoint();
+        });
+        std::vector<Sigma1d> lst1 = O.getList1D();
+        std::sort(lst1.begin(), lst1.end(), [&](const Sigma1d& s1, const Sigma1d& s2) {
+            return s1.getPoint() < s2.getPoint();
+        });
         for (int i = 0; i < (int)lst.size(); i++) {
             for (int j = 0; j < (int)lst1.size(); j++){
-                if (lst[i]->getType()!=lst1[j]->getType()){
+                if (lst[i].getType()!=lst1[j].getType()){
                     continue;
                 }
-                auto s1 = std::dynamic_pointer_cast<Sigma1d>(lst[i]);
-                auto s11 = std::dynamic_pointer_cast<Sigma1d>(lst1[j]);
+                auto s1 = lst[i];
+                auto s11 = lst1[j];
 
-                if (s1->getC()==s11->getC()){
+                if (s1.getC()==s11.getC()){
                     continue;
                 }
                 int imm=0;
-                int nc=LeviChivita(s1->getC(),s11->getC());
+                int nc=LeviChivita(s1.getC(),s11.getC());
                 imm++;
                 if (O.im==true){
                     imm++;
@@ -204,34 +222,32 @@ void Expression::Commute(std::vector <Expression> &O1,  const Expression &O)
                     imm+=2;
                     nc=nc*(-1);
                 }
-                int pd=s11->getPoint()-s1->getPoint();
+
+                // строим список сигм, отсортированный по точке
+                int pd=s11.getPoint()-s1.getPoint();
+                int deltaLst1 = -std::min(pd, 0), deltaLst = std::max(0, pd);
                 std::vector<Sigma1d> lst3;
-                for (int k = 0; k < (int)lst.size(); k++) {
-                    Sigma1d t = *std::dynamic_pointer_cast<Sigma1d>(lst[k]);
-                    if (k==i){
-                        t.setC(nc);
+                size_t ptr = 0, ptr1 = 0;
+                while(ptr < lst.size() || ptr1 < lst1.size()) {
+                    if(ptr1 == j)
+                        ptr1++;
+                    else if(ptr1 < lst1.size() && (ptr == lst.size() || (lst1[ptr1].getPoint() + deltaLst1 < lst[ptr].getPoint() + deltaLst))) {
+                        Sigma1d t = lst1[ptr1];
+                        t.setPoint(t.getPoint() + deltaLst1);
+                        lst3.push_back(t);
+                        ptr1++;
+                    } else {
+                        Sigma1d t = lst[ptr];
+                        if (ptr==i)
+                            t.setC(nc);
+                        t.setPoint(t.getPoint() + deltaLst);
+                        lst3.push_back(t);
+                        ptr++;
                     }
-                    if (pd>0){
-                        t.setPoint(t.getPoint()+pd);
-                    }
-                    lst3.push_back(t);
-                }
-                for (int k = 0; k < (int)lst1.size(); k++) {
-                    if (k==j){
-                        continue;
-                    }
-                    Sigma1d t = *std::dynamic_pointer_cast<Sigma1d>(lst1[k]);
-                    if (pd<0){
-                        t.setPoint(t.getPoint()-pd);
-                    }
-                    lst3.push_back(t);
                 }
 
                 // ??? схлопываем сигмы, попавшие в одну точку
                 int nn=0;
-                std::sort(lst3.begin(), lst3.end(), [](const Sigma1d& s1, const Sigma1d& s2) {
-                    return s1 < s2;
-                });
                 std::vector<Sigma1d> lst32;
                 for(size_t k = 0; k < lst3.size(); k++) {
                     if(!lst32.empty() && lst32.back().getPoint() == lst3[k].getPoint()) {

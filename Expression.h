@@ -33,6 +33,8 @@ private:
 
     void setSigmas1D(const std::vector<Sigma1d>& sigmas);
     void setSigmas2D(const std::vector<Sigma2d>& sigmas);
+
+    std::vector<Sigma1d> getList1D() const;
 public:
     Expression() = default;
     //Конструктор от строки
