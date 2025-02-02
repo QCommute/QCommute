@@ -13,10 +13,11 @@ dependencies += dependency('gmp')
 
 src_files = [
     'main.cpp',
+    'BigInt.cpp',
     'Monom.cpp',
     'Expression.cpp',
     'Sigma.cpp',
-    'Poly.cpp'
+    'Poly.cpp',
 ]
 executable('main', src_files, dependencies : dependencies)
 
