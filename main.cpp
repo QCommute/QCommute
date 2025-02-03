@@ -36,7 +36,7 @@ struct Node {
     Expression expr;
     Node* next;
 
-    Node(Expression&& expr_, Node* next_) : expr(expr_) {
+    Node(Expression&& expr_, Node* next_) : expr(std::move(expr_)) {
         next = next_;
     }
 };
