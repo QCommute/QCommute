@@ -34,12 +34,13 @@ bool Monom::isZero() const {
     return coef == 0;
 }
 
-bool Monom::samePowers(const Monom& other) const {
-    return pows == other.pows;
-}
-
-bool Monom::lessPowers(const Monom& other) const {
-    return pows < other.pows;
+int Monom::comparePowers(const Monom& other) const {
+    for(size_t i = 0; i < std::min(pows.size(), other.pows.size()); i++)
+        if(pows[i] != other.pows[i])
+            return (pows[i] < other.pows[i]) ? -1 : 1;
+    if(pows.size() < other.pows.size())
+        return -1;
+    return (pows.size() == other.pows.size()) ? 0 : 1;
 }
 
 void Monom::Sum(const Monom& mn) {

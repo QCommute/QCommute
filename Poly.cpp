@@ -16,12 +16,12 @@ Poly::Poly(const std::string& str) {
     }
     
     std::sort(data_.begin(), data_.end(), [](const Monom& m1, const Monom& m2) {
-        return m1.lessPowers(m2);
+        return m1.comparePowers(m2) < 0;
     });
     size_t ptr = 0;
     std::vector<size_t> goodIndices = {0};
     for(size_t i = 1; i < data_.size(); i++) {
-        if(data_[i].samePowers(data_[i - 1])) {
+        if(data_[i].comparePowers(data_[i - 1]) == 0) {
             data_[ptr].Sum(data_[i]);
         } else {
             ptr = i;
@@ -61,20 +61,31 @@ Poly& Poly::operator+=(const Poly& other) {
     std::vector<Monom> dataRes;
     size_t ptr1 = 0, ptr2 = 0;
     while(ptr1 < data_.size() || ptr2 < other.data_.size()) {
-        if(ptr1 < data_.size() && !dataRes.empty() && dataRes.back().samePowers(data_[ptr1])) {
-            dataRes.back().Sum(data_[ptr1]);
-            if(dataRes.back().isZero())
-                dataRes.pop_back();
-            ptr1++;
-        } else if(ptr2 < other.data_.size() && !dataRes.empty() && dataRes.back().samePowers(other.data_[ptr2])) {
-            dataRes.back().Sum(other.data_[ptr2]);
-            if(dataRes.back().isZero())
-                dataRes.pop_back();
-            ptr2++;
-        } else if(ptr1 < data_.size() && (ptr2 == other.data_.size() || data_[ptr1].lessPowers(other.data_[ptr2]))) {
+        bool take1 = false, take2 = false;
+        if(ptr1 == data_.size())
+            take2 = true;
+        else if(ptr2 == other.data_.size())
+            take1 = true;
+        else {
+            int powerCompRes = data_[ptr1].comparePowers(other.data_[ptr2]);
+            if(powerCompRes < 0)
+                take1 = true;
+            else if(powerCompRes > 0)
+                take2 = true;
+            else {
+                dataRes.push_back(data_[ptr1]);
+                dataRes.back().Sum(other.data_[ptr2]);
+                if(dataRes.back().isZero())
+                    dataRes.pop_back();
+                ptr1++;
+                ptr2++;
+            }
+        }
+
+        if(take1) {
             dataRes.push_back(data_[ptr1]);
             ptr1++;
-        } else {
+        } else if(take2) {
             dataRes.push_back(other.data_[ptr2]);
             ptr2++;
         }
