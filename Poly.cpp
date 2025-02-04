@@ -1,38 +1,45 @@
 #include "Poly.h"
-#include <gmp-x86_64.h>
+#include <map>
 
 Poly::Poly(const std::string& str) {
     assert(str[0] == '[');
     assert(str.back() == ']');
 
+    std::map<std::vector<uint8_t>, BigInt> data;
     size_t cur = 0;
     while(str[cur] != ']') {
         assert(str[cur] == ';' || str[cur] == '[');
         size_t next = cur + 1;
         while(str[next] != ';' && str[next] != ']')
             next++;
-        data_.emplace_back(str.substr(cur + 1, next - cur - 1));
+
+        BigInt coefCur;
+        std::vector<uint8_t> powersCur;
+
+        std::string strMonom(str.begin() + cur + 1, str.begin() + next);
+        size_t startOfNumber = 0;
+        for(size_t i = 1; i <= strMonom.size(); i++)
+            if(i == strMonom.size() || strMonom[i] == ',') {
+                if(startOfNumber == 0)
+                    coefCur = BigInt(strMonom.substr(startOfNumber, i - startOfNumber));
+                else
+                    powersCur.push_back(std::stoi(strMonom.substr(startOfNumber, i - startOfNumber)));
+                startOfNumber = i + 1;
+            }
+
+        auto it = data.find(powersCur);
+        if(it == data.end())
+            data[powersCur] = coefCur;
+        else {
+            it->second += coefCur;
+            if(it->second == 0)
+                data.erase(it);
+        }
         cur = next;
     }
     
-    std::sort(data_.begin(), data_.end(), [](const Monom& m1, const Monom& m2) {
-        return m1.comparePowers(m2) < 0;
-    });
-    size_t ptr = 0;
-    std::vector<size_t> goodIndices = {0};
-    for(size_t i = 1; i < data_.size(); i++) {
-        if(data_[i].comparePowers(data_[i - 1]) == 0) {
-            data_[ptr].Sum(data_[i]);
-        } else {
-            ptr = i;
-            goodIndices.push_back(i);   
-        }
-    }
-    std::vector<Monom> data2;
-    for(size_t i : goodIndices)
-        if(!data_[i].isZero())
-            data2.push_back(data_[i]);
-    data_ = data2;
+    for(const auto& [powers, coeff] : data)
+        data_.emplace_back(powers, coeff);
 }
 
 bool Poly::isZero() const {

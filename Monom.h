@@ -16,7 +16,7 @@ private:
     std::vector<uint8_t> pows; //список степеней
     BigInt coef; //коэффициент
 public:
-    Monom(const std::string &s);
+    Monom(const std::vector<uint8_t>& pows, const BigInt& coeff);
 
     bool operator==(const Monom& other) const;
     bool isZero() const;

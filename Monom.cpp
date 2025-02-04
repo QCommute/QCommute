@@ -4,26 +4,8 @@
 //класс мономов, в прицнипе я думал переписать его и сделать класс полиномов, но пока не сделал.
 //моном содежит список степеней и коэффициент. в списке степеней каждому элементу соответвует степень некого параметра, число параметров в принципе не ограничено
 
-Monom::Monom(const std::string& s) {
-    size_t pos = 0;
-    bool has_coeff = false;
-    while (pos < s.size()) {
-        if (s[pos]==','){
-            pos++;
-        }
-        std::string nums = "";
-        while ((s[pos] >= '0' && s[pos] <= '9') || (s[pos] == '-')){
-            nums.push_back(s[pos]);
-            pos++;
-        }
-        
-        if (!has_coeff) {
-            coef = BigInt(nums);
-            has_coeff = true;
-        } else {
-            pows.push_back(std::stoi(nums));
-        }
-    }
+Monom::Monom(const std::vector<uint8_t>& pows, const BigInt& coeff) : pows(pows), coef(coeff) {
+    // Do nothing
 }
 
 bool Monom::operator==(const Monom& other) const {
