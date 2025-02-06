@@ -14,7 +14,6 @@ dependencies += dependency('gmp')
 src_files = [
     'main.cpp',
     'BigInt.cpp',
-    'Monom.cpp',
     'Expression.cpp',
     'Sigma.cpp',
     'Poly.cpp',

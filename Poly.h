@@ -2,7 +2,7 @@
 
 #include <vector>
 #include <memory>
-#include "Monom.h"
+#include "BigInt.h"
 
 class Poly {
 private:
@@ -10,9 +10,14 @@ private:
     // * слагаемые идут в лексикографическом порядке векторов степеней;
     // * нет подобных слагаемых;
     // * нет слагаемых с нулевым коэффициентом
-    std::vector<Monom> data_;
+    //std::vector<Monom> data_;
+    std::vector<uint8_t> powers_;
+    std::vector<BigInt> coefs_;
+
+    static constexpr uint8_t MONOM_END = 254;
+    static constexpr uint8_t POLY_END = 255;
 public:
-    Poly() = default;
+    Poly();
     Poly(const std::string& str);
 
     bool isZero() const;
