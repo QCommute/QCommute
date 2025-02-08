@@ -198,11 +198,9 @@ void Expression::Commute(std::vector <Expression> &O1,  const Expression &O)
         std::sort(lst1.begin(), lst1.end(), [&](const Sigma1d& s1, const Sigma1d& s2) {
             return s1.getPoint() < s2.getPoint();
         });
+        Sigma1d* lst3 = new Sigma1d[lst.size() + lst1.size()];
         for (int i = 0; i < (int)lst.size(); i++) {
-            for (int j = 0; j < (int)lst1.size(); j++){
-                if (lst[i].getType()!=lst1[j].getType()){
-                    continue;
-                }
+            for (int j = 0; j < (int)lst1.size(); j++) {
                 auto s1 = lst[i];
                 auto s11 = lst1[j];
 
@@ -226,7 +224,7 @@ void Expression::Commute(std::vector <Expression> &O1,  const Expression &O)
                 // строим список сигм, отсортированный по точке
                 int pd=s11.getPoint()-s1.getPoint();
                 int deltaLst1 = -std::min(pd, 0), deltaLst = std::max(0, pd);
-                std::vector<Sigma1d> lst3;
+                size_t lst3Size = 0;
                 size_t ptr = 0, ptr1 = 0;
                 while(ptr < lst.size() || ptr1 < lst1.size()) {
                     if(ptr1 == j)
@@ -234,14 +232,14 @@ void Expression::Commute(std::vector <Expression> &O1,  const Expression &O)
                     else if(ptr1 < lst1.size() && (ptr == lst.size() || (lst1[ptr1].getPoint() + deltaLst1 < lst[ptr].getPoint() + deltaLst))) {
                         Sigma1d t = lst1[ptr1];
                         t.setPoint(t.getPoint() + deltaLst1);
-                        lst3.push_back(t);
+                        lst3[lst3Size++] = t;
                         ptr1++;
                     } else {
                         Sigma1d t = lst[ptr];
                         if (ptr==i)
                             t.setC(nc);
                         t.setPoint(t.getPoint() + deltaLst);
-                        lst3.push_back(t);
+                        lst3[lst3Size++] = t;
                         ptr++;
                     }
                 }
@@ -249,7 +247,7 @@ void Expression::Commute(std::vector <Expression> &O1,  const Expression &O)
                 // ??? схлопываем сигмы, попавшие в одну точку
                 int nn=0;
                 std::vector<Sigma1d> lst32;
-                for(size_t k = 0; k < lst3.size(); k++) {
+                for(size_t k = 0; k < lst3Size; k++) {
                     if(!lst32.empty() && lst32.back().getPoint() == lst3[k].getPoint()) {
                         if(lst32.back().getC() == lst3[k].getC())
                             lst32.pop_back();
@@ -266,30 +264,30 @@ void Expression::Commute(std::vector <Expression> &O1,  const Expression &O)
                     } else
                         lst32.push_back(lst3[k]);
                 }
-                lst3 = lst32;
                 if ((nn % 2) != 0) {
                     continue;
                 }
 
                 // ??? сдвигаем минимум в точку 1
-                if(!lst3.empty()) {
-                    int mp = lst3[0].getPoint();
-                    for(size_t k = 1; k < lst3.size(); k++)
-                        mp = std::min(mp, lst3[k].getPoint());
+                if(!lst32.empty()) {
+                    int mp = lst32[0].getPoint();
+                    for(size_t k = 1; k < lst32.size(); k++)
+                        mp = std::min(mp, lst32[k].getPoint());
 
                     int delta = (mp > 1) ? (-mp + 1) : 0;
-                    for(size_t k = 0; k < lst3.size(); k++)
-                        lst3[k].setPoint(lst3[k].getPoint() + delta);
+                    for(size_t k = 0; k < lst32.size(); k++)
+                        lst32[k].setPoint(lst32[k].getPoint() + delta);
                 }
 
                 // ??? создаем новое выражение
                 imm = imm % 4;
                 if(imm == 2 || imm == 3)
-                    O1.emplace_back(lst3, pol1 * (-1), (imm % 2) == 1);
+                    O1.emplace_back(lst32, pol1 * (-1), (imm % 2) == 1);
                 else
-                    O1.emplace_back(lst3, pol1, (imm % 2) == 1);
+                    O1.emplace_back(lst32, pol1, (imm % 2) == 1);
             }
         }
+        delete[] lst3;
     } else if(dim == 2) {
         std::vector<std::shared_ptr<Sigma>> lst = getList();
         std::vector<std::shared_ptr<Sigma>> lst1 = O.getList();
