@@ -11,9 +11,9 @@
 #include <memory>
 #include "Sigma.h"
 #include "Poly.h"
-int PrimeNumber(int n);
+
 int LeviChivita(int i, int j);
-bool prime(long int n);
+
 class Sigma;
 
 //Класс для выражения. Возможно основной класс в программе
@@ -47,10 +47,6 @@ public:
     
     void Commute(std::vector <Expression> &O1,  const Expression &O);
     bool operator==(const Expression &ex1) const;
-    int getLength() const;
-    uint8_t TotalLength();
-    uint8_t MaxPoint();
-    void MakeMbr(mpz_t mmbr_x, mpz_t mbr_y, mpz_t mbr_z, uint8_t Mp);
     std::vector<std::shared_ptr<Sigma>> getList() const;
     Poly& getPoly();
     const Poly& getPoly() const;

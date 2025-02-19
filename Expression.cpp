@@ -11,8 +11,6 @@
 #include <bitset>
 #include "SerializationHelpers.h"
 
-extern int indcount;
-extern int lorindcount;
 extern std::string directoryPath;
 using namespace std;
 //Expression самый главный класс, он включает в себя список элементов класса Sigma (строки Паули) и многочлен (список мономов)
@@ -185,10 +183,6 @@ Poly& Expression::getPoly()
 const Poly& Expression::getPoly() const
 {
     return poly;
-}
-int Expression::getLength() const
-{
-    return (int)getList().size();
 }
 
 //самый главный оператор (коммутатор списка с элементов)
@@ -406,101 +400,14 @@ void Expression::Commute(std::vector <Expression> &O1,  const Expression &O)
 
                 // ??? создаем новое выражение
                 imm = imm % 4;
-                Expression n_exp(lst3, pol1 * ((imm == 2 || imm == 3) ? (-1) : 1), (imm % 2) == 1); //это строчка с коэффициентов, таких утт создается много, все они в целом дают результат 
-
-                uint8_t Tl= n_exp.TotalLength();
-                uint8_t Mp= n_exp.MaxPoint();
-                mpz_t mbr_x;
-                mpz_t mbr_y;
-                mpz_t mbr_z;
-                mpz_init(mbr_x);
-                mpz_init(mbr_y);
-                mpz_init(mbr_z);
-                n_exp.MakeMbr(mbr_x, mbr_y, mbr_z, Mp); //Вот тут создаем как раз те самые числа
-                int numBitsx = mpz_sizeinbase(mbr_x, 2);
-                int numBitsy = mpz_sizeinbase(mbr_y, 2);
-                int numBitsz = mpz_sizeinbase(mbr_z, 2);
-                uint8_t numBytesx = (numBitsx + 7) / 8; // округляем в большую сторону
-                uint8_t numBytesy = (numBitsy + 7) / 8; // округляем в большую сторону
-                uint8_t numBytesz = (numBitsz + 7) / 8; // округляем в большую сторону
-                char* bufferx = new char[numBytesx];
-                char* buffery = new char[numBytesy];
-                char* bufferz = new char[numBytesz];
-                mpz_export(bufferx, nullptr, 1, 1, 0, 0, mbr_x);
-                mpz_export(buffery, nullptr, 1, 1, 0, 0, mbr_y);
-                mpz_export(bufferz, nullptr, 1, 1, 0, 0, mbr_z);
-                #pragma omp critical
-                {
-                    //cout << mbr_x<< "ddwdw" << mbr_y << endl;
-                    //создаем файл с соответвующим названием и помещаем в него эти числа
-                    std::ofstream ofs(directoryPath+"/"+std::to_string(Mp)+"_"+std::to_string(Tl)+".bin", std::ios::binary);
-                    ofs.write(reinterpret_cast<char*>(&numBytesx), sizeof(numBytesx));                      
-                    ofs.write(bufferx, numBytesx);
-                    ofs.write(reinterpret_cast<char*>(&numBytesx), sizeof(numBytesx));                      
-                    ofs.write(buffery, numBytesx);
-                    ofs.write(reinterpret_cast<char*>(&numBytesx), sizeof(numBytesx));                      
-                    ofs.write(bufferz, numBytesx);
-                    ofs.close(); //пока я эти файлы не использую, не успел ещё это сделать, просто в них скалдываем, еще нужно скалдывать в файлы полиномы, пока тоже не реализовано
-                    O1.push_back(n_exp); //так что пока кладем в опретивную память и создаем новый список
-                }
-                delete[] bufferx;
-                delete[] buffery;
-                delete[] bufferz;
+                if(imm == 2 || imm == 3)
+                    O1.emplace_back(lst3, pol1 * (-1), (imm % 2) == 1);
+                else
+                    O1.emplace_back(lst3, pol1, (imm % 2) == 1);
             }
         }
     }
 }
-
-uint8_t Expression::TotalLength()
-{
-    auto lst = getList();
-    
-    return lst.size();
-}
-uint8_t Expression::MaxPoint()
-{
-    auto lst = getList();
-    
-    uint8_t mp=0;
-    for (int i = 0; i < (int)lst.size(); i++){
-        auto s1 = std::dynamic_pointer_cast<Sigma1d>(lst[i]);
-        auto s2 = std::dynamic_pointer_cast<Sigma2d>(lst[i]);
-        auto s3 = std::dynamic_pointer_cast<Sigma3d>(lst[i]);
-        if (s1){
-            if (s1->getPoint()>mp){
-                mp=s1->getPoint();
-            }
-        }
-        if (s2){
-            if (s2->getPoint1()>mp){
-                mp=s2->getPoint1();
-            }
-            if (s2->getPoint2()>mp){
-                mp=s2->getPoint2();
-            }
-        }
-    }
-    return mp;
-}
-
-void Expression::MakeMbr(mpz_t mbr_x, mpz_t mbr_y, mpz_t mbr_z, uint8_t Mp)//функция которая создает три числа из строчки Паули
-{
-    auto lst = getList();
-    
-    for (int i = 0; i < (int)lst.size(); i++){
-        auto s2 = std::dynamic_pointer_cast<Sigma2d>(lst[i]);
-        if (s2->getC()==1){
-            mpz_setbit(mbr_x, Mp*(s2->getPoint1()-1)+s2->getPoint2()-1);
-        }
-        if (s2->getC()==2){
-            mpz_setbit(mbr_y, Mp*(s2->getPoint1()-1)+s2->getPoint2()-1);
-        }
-        if (s2->getC()==3){
-            mpz_setbit(mbr_z, Mp*(s2->getPoint1()-1)+s2->getPoint2()-1);
-        }
-    }
-}
-
 
 bool Expression::operator==(const Expression &ex1) const {
     if (im != ex1.im || numSigmaX != ex1.numSigmaX || numSigmaY != ex1.numSigmaY)
@@ -545,27 +452,6 @@ if (i==3){
 return 0;
 }
 
-int PrimeNumber(int n){
-    int k=0;
-    long int test=1;
-    while(k<n){
-          test++;
-          if (prime(test)==true){
-            k++;
-          }
-    }
-    return test;
-}
-bool prime(long int n){
-	for(long int i=2;i<=sqrt(n);i++)
-		if(n%i==0)
-			return false;
-	return true;
-}
-//std::vector<int> Expression::getCoeff() const
-//{
- //   return coef;
-//}
 void Expression::print() const {
     auto lst = getList();
     
@@ -585,7 +471,6 @@ void Expression::print() const {
 }
 
 void Expression::serialize(std::vector<uint8_t>& res) const {
-    //std::cerr << "HERE" << "\n";
     serializeUInt32(res, numSigmaX);
     serializeUInt32(res, numSigmaY);
     serializeUInt32(res, sigmaCoords.size() / dim - numSigmaX - numSigmaY);
@@ -594,8 +479,6 @@ void Expression::serialize(std::vector<uint8_t>& res) const {
     for(size_t i = 0; i < sigmaCoords.size(); i++)
         serializeInt32(res, sigmaCoords[i]);
     poly.serialize(res);
-    //std::cerr << "HERE2" << "\n";
-    //std::cerr << res.size() << "\n";
 }
 
 size_t ExpressionHasher::operator()(const Expression& expr) const {
