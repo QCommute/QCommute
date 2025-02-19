@@ -2,6 +2,7 @@
 #include <map>
 #include <cassert>
 #include <iostream>
+#include "SerializationHelpers.h"
 
 Poly::Poly() {
     powers_ = {POLY_END};
@@ -52,6 +53,20 @@ Poly::Poly(const std::string& str) {
     powers_.push_back(POLY_END);
 }
 
+Poly::Poly(const std::vector<uint8_t>& data, size_t& ptr) {
+    uint8_t x;
+    size_t numMonoms = 0;
+    do {
+        x = deserializeUInt8(data, ptr);
+        powers_.push_back(x);
+        if(x == MONOM_END)
+            numMonoms++;
+    } while(x != POLY_END);
+
+    for(size_t i = 0; i < numMonoms; i++)
+        coefs_.emplace_back(data, ptr);
+}
+
 bool Poly::isZero() const {
     return coefs_.empty();
 }
@@ -71,6 +86,13 @@ void Poly::print() const {
         ptr++;
     }
     std::cout << ']';
+}
+
+void Poly::serialize(std::vector<uint8_t>& res) const {
+    for(size_t i = 0; i < powers_.size(); i++)
+        serializeUInt8(res, powers_[i]);
+    for(size_t i = 0; i < coefs_.size(); i++)
+        coefs_[i].serialize(res);
 }
 
 Poly& Poly::operator+=(const Poly& other) {
@@ -120,11 +142,11 @@ Poly& Poly::operator+=(const Poly& other) {
                     while(powers_[ptr1] != MONOM_END)
                         ptr1++;
                     ptr1++;
-                    while(powers_[ptr2] != MONOM_END)
+                    while(other.powers_[ptr2] != MONOM_END)
                         ptr2++;
                     ptr2++;
                 } else {
-                    size_t oldPtr1 = ptr1;;
+                    size_t oldPtr1 = ptr1;
                     for(; powers_[ptr1] != MONOM_END; ptr1++)
                         powersRes.push_back(powers_[ptr1]);
                     ptr1++;

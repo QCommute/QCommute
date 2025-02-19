@@ -9,6 +9,8 @@
 #include <omp.h>
 #include <algorithm>
 #include <bitset>
+#include "SerializationHelpers.h"
+
 extern int indcount;
 extern int lorindcount;
 extern std::string directoryPath;
@@ -77,6 +79,18 @@ Expression::Expression(const std::string& s)
             lst2.push_back(*std::dynamic_pointer_cast<Sigma2d>(lst[i]));
         setSigmas2D(lst2);
     }
+}
+
+Expression::Expression(const std::vector<uint8_t>& data, size_t& ptr) {
+    numSigmaX = deserializeUInt32(data, ptr);
+    numSigmaY = deserializeUInt32(data, ptr);
+    uint32_t numSigmaZ = deserializeUInt32(data, ptr);
+    im = deserializeUInt8(data, ptr) == 1;
+    dim = deserializeUInt8(data, ptr);
+    for(size_t i = 0; i < (numSigmaX + numSigmaY + numSigmaZ) * dim; i++)
+        sigmaCoords.push_back(deserializeInt32(data, ptr));
+    //std::cerr << "HERE" << " " << ptr << "\n";
+    poly = Poly(data, ptr);
 }
 
 Expression::Expression(const std::vector<Sigma1d> &v, const Poly& r, bool imm) {
@@ -552,8 +566,7 @@ bool prime(long int n){
 //{
  //   return coef;
 //}
-void Expression::print()
-{
+void Expression::print() const {
     auto lst = getList();
     
     if (im==true){
@@ -569,6 +582,20 @@ void Expression::print()
         }
     }
     std::cout << std::endl;
+}
+
+void Expression::serialize(std::vector<uint8_t>& res) const {
+    //std::cerr << "HERE" << "\n";
+    serializeUInt32(res, numSigmaX);
+    serializeUInt32(res, numSigmaY);
+    serializeUInt32(res, sigmaCoords.size() / dim - numSigmaX - numSigmaY);
+    serializeUInt8(res, im ? 1 : 0);
+    serializeUInt8(res, dim);
+    for(size_t i = 0; i < sigmaCoords.size(); i++)
+        serializeInt32(res, sigmaCoords[i]);
+    poly.serialize(res);
+    //std::cerr << "HERE2" << "\n";
+    //std::cerr << res.size() << "\n";
 }
 
 size_t ExpressionHasher::operator()(const Expression& expr) const {

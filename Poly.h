@@ -21,9 +21,11 @@ private:
 public:
     Poly();
     Poly(const std::string& str);
+    Poly(const std::vector<uint8_t>& data, size_t& ptr);
 
     bool isZero() const;
     void print() const;
+    void serialize(std::vector<uint8_t>& res) const;
 
     Poly& operator+=(const Poly& other);
     Poly operator*(const Poly& other) const;

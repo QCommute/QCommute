@@ -42,7 +42,9 @@ public:
     //Конструктор от списка множителей и коэффициента, который по умолчанию 1
     Expression(const std::vector<Sigma1d> &v, const Poly& r, bool imm);
     Expression(const std::vector<Sigma2d> &v, const Poly& r, bool imm);
-
+    //Конструктор для загрузки из сериализованного представления
+    Expression(const std::vector<uint8_t>& data, size_t& ptr);
+    
     void Commute(std::vector <Expression> &O1,  const Expression &O);
     bool operator==(const Expression &ex1) const;
     int getLength() const;
@@ -52,7 +54,9 @@ public:
     std::vector<std::shared_ptr<Sigma>> getList() const;
     Poly& getPoly();
     const Poly& getPoly() const;
-    void print();
+    
+    void print() const;
+    void serialize(std::vector<uint8_t>& res) const;
 };
 
 struct ExpressionHasher {

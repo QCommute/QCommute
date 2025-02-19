@@ -1,5 +1,8 @@
 #pragma once
+
 #include <gmpxx.h>
+#include <vector>
+#include <cstdint>
 
 class BigInt {
 private:
@@ -7,6 +10,7 @@ private:
 public:
     BigInt();
     BigInt(const std::string& str);
+    BigInt(const std::vector<uint8_t>& data, size_t& ptr);
     
     BigInt(const BigInt& other);
     BigInt& operator=(const BigInt& other);
@@ -21,6 +25,7 @@ public:
     BigInt& operator*=(int n);
 
     void print() const;
+    void serialize(std::vector<uint8_t>& res) const;
     
     ~BigInt();
 };

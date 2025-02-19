@@ -13,6 +13,7 @@ dependencies += dependency('gmp')
 
 src_files = [
     'main.cpp',
+    'SerializationHelpers.cpp',
     'BigInt.cpp',
     'Expression.cpp',
     'Sigma.cpp',
