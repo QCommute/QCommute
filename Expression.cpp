@@ -186,8 +186,7 @@ const Poly& Expression::getPoly() const
 }
 
 //самый главный оператор (коммутатор списка с элементов)
-void Expression::Commute(std::vector <Expression> &O1,  const Expression &O)
-{
+void Expression::Commute(const Expression& O, std::function<void(Expression&& newExpression)> callback) {
     if(sigmaCoords.empty() || O.sigmaCoords.empty())
         return;
     assert(dim == O.dim);
@@ -289,10 +288,13 @@ void Expression::Commute(std::vector <Expression> &O1,  const Expression &O)
 
                 // ??? создаем новое выражение
                 imm = imm % 4;
-                if(imm == 2 || imm == 3)
-                    O1.emplace_back(lst32, pol1 * (-1), (imm % 2) == 1);
-                else
-                    O1.emplace_back(lst32, pol1, (imm % 2) == 1);
+                if(imm == 2 || imm == 3) {
+                    Expression O1(lst32, pol1 * (-1), (imm % 2) == 1);
+                    callback(std::move(O1));
+                } else {
+                    Expression O1(lst32, pol1, (imm % 2) == 1);
+                    callback(std::move(O1));
+                }
             }
         }
         delete[] lst3;
@@ -400,10 +402,13 @@ void Expression::Commute(std::vector <Expression> &O1,  const Expression &O)
 
                 // ??? создаем новое выражение
                 imm = imm % 4;
-                if(imm == 2 || imm == 3)
-                    O1.emplace_back(lst3, pol1 * (-1), (imm % 2) == 1);
-                else
-                    O1.emplace_back(lst3, pol1, (imm % 2) == 1);
+                if(imm == 2 || imm == 3) {
+                    Expression O1(lst3, pol1 * (-1), (imm % 2) == 1);
+                    callback(std::move(O1));
+                } else {
+                    Expression O1(lst3, pol1, (imm % 2) == 1);
+                    callback(std::move(O1));
+                }
             }
         }
     }

@@ -9,6 +9,7 @@
 #include <cmath>
 #include <cstdio>
 #include <memory>
+#include <functional>
 #include "Sigma.h"
 #include "Poly.h"
 
@@ -45,7 +46,7 @@ public:
     //Конструктор для загрузки из сериализованного представления
     Expression(const std::vector<uint8_t>& data, size_t& ptr);
     
-    void Commute(std::vector <Expression> &O1,  const Expression &O);
+    void Commute(const Expression& O, std::function<void(Expression&& newExpression)> callback);
     bool operator==(const Expression &ex1) const;
     std::vector<std::shared_ptr<Sigma>> getList() const;
     Poly& getPoly();

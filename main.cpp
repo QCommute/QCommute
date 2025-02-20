@@ -222,28 +222,25 @@ main(int argc, char** argv)
                     
                     std::vector<Expression> expressionsCur = loadAndDeleteHashTableBlock(directoryPath, t, curHash);
                     
-                    std::vector<Expression> cur;
                     for (size_t i = 0; i < H.size(); i++)
                         for(size_t j = 0; j < expressionsCur.size(); j++)
-                            H[i].Commute(cur, expressionsCur[j]); //коммутируем все салгаемые с гамильтонанном.
-                    
-                    for(size_t k = 0; k < cur.size(); k++) {
-                        size_t hash = ExpressionHasher()(cur[k]);
-                        std::lock_guard<std::mutex> guard(indexMutexes[(hash % tableSize) / 16]);
-                        Node* cur_node = indices[hash % tableSize];
-                        bool found = false;
-                        while(cur_node != nullptr) {
-                            if(cur_node->expr == cur[k]) {
-                                cur_node->expr.getPoly() += cur[k].getPoly();
-                                found = true;
-                                break;
-                            }
-                            cur_node = cur_node->next;
-                        }
-                        if(!found) {
-                            indices[hash % tableSize] = new Node(std::move(cur[k]), indices[hash % tableSize]);
-                        }
-                    }
+                            H[i].Commute(expressionsCur[j], [&](Expression&& newExpression) {
+                                size_t hash = ExpressionHasher()(newExpression);
+                                std::lock_guard<std::mutex> guard(indexMutexes[(hash % tableSize) / 16]);
+                                Node* cur_node = indices[hash % tableSize];
+                                bool found = false;
+                                while(cur_node != nullptr) {
+                                    if(cur_node->expr == newExpression) {
+                                        cur_node->expr.getPoly() += newExpression.getPoly();
+                                        found = true;
+                                        break;
+                                    }
+                                    cur_node = cur_node->next;
+                                }
+                                if(!found) {
+                                    indices[hash % tableSize] = new Node(std::move(newExpression), indices[hash % tableSize]);
+                                }
+                            }); //коммутируем все салгаемые с гамильтонанном.
                 }
             });
         }
