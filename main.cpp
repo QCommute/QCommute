@@ -97,6 +97,36 @@ size_t moveHashTableBlockToDisk(const std::string& dir, size_t level, size_t sta
 std::string directoryPath;
 typedef std::chrono::high_resolution_clock Clock;
 
+size_t moveHashTableToDisk(size_t level, size_t tableSize, Node** indices) {
+    size_t O_size = 0;
+    size_t nextHash = 0;
+    std::mutex taskMutex, resMutex;
+    
+    std::vector<std::thread> threads;
+    size_t num_threads = std::thread::hardware_concurrency();
+    for(size_t tt = 0; tt < num_threads; tt++) {
+        threads.emplace_back([&nextHash, &O_size, &taskMutex, &resMutex, indices, tableSize, level]() {
+            while(true) {
+                std::unique_lock<std::mutex> lock(taskMutex);
+                if(nextHash >= tableSize)
+                    return;
+                size_t curHash = nextHash;
+                nextHash += BLOCK_SIZE;
+                lock.unlock();
+
+                size_t added = moveHashTableBlockToDisk(directoryPath, level, curHash, tableSize, indices);
+
+                std::lock_guard<std::mutex> lock2(resMutex);
+                O_size += added;
+            }
+        });
+    }
+    for(size_t j = 0; j < threads.size(); j++)
+        threads[j].join();
+    
+    return O_size;
+}
+
 int
 main(int argc, char** argv)
 {
@@ -252,9 +282,7 @@ main(int argc, char** argv)
         std::cerr << "Подсчет коммутаторов и приведение подобных: " << (std::chrono::duration_cast<std::chrono::microseconds>(time3 - time2).count())/1000000.0 << " сек" << std::endl;
         
         // Сохраняем новый слой на диск и удаляем его из памяти
-        O_size = 0;
-        for(size_t i = 0; i < tableSize; i += BLOCK_SIZE)
-            O_size += moveHashTableBlockToDisk(directoryPath, t + 1, i, tableSize, indices);
+        O_size = moveHashTableToDisk(t + 1, tableSize, indices);
 
         delete[] indices;
         prevTableSize = tableSize;
