@@ -15,12 +15,13 @@
 
 int LeviChivita(int i, int j);
 
-class Sigma;
-
 //Класс для выражения. Возможно основной класс в программе
 
 class Expression {
     friend struct ExpressionHasher;
+    
+    template<size_t D>
+    friend void commuteImpl(const Expression& O1, const Expression& O2, std::function<void(Expression&& newExpression)> callback);
 private:
     //коэффициент
     Poly poly;
@@ -35,7 +36,8 @@ private:
     void setSigmas1D(const std::vector<Sigma1d>& sigmas);
     void setSigmas2D(const std::vector<Sigma2d>& sigmas);
 
-    std::vector<Sigma1d> getList1D() const;
+    template<size_t D>
+    std::vector<Sigma<D>> getList() const;
 public:
     Expression() = default;
     //Конструктор от строки
@@ -48,7 +50,6 @@ public:
     
     void Commute(const Expression& O, std::function<void(Expression&& newExpression)> callback);
     bool operator==(const Expression &ex1) const;
-    std::vector<std::shared_ptr<Sigma>> getList() const;
     Poly& getPoly();
     const Poly& getPoly() const;
     

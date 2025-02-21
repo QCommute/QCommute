@@ -16,7 +16,6 @@ src_files = [
     'SerializationHelpers.cpp',
     'BigInt.cpp',
     'Expression.cpp',
-    'Sigma.cpp',
     'Poly.cpp',
 ]
 executable('main', src_files, dependencies : dependencies)

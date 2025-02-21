@@ -14,7 +14,6 @@
 #include <cstdio>
 #include <bitset>
 #include "Expression.h"
-#include "Sigma.h"
 //#include <conio.h>
 #include <thread>
 #include <mutex>
