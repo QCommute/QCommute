@@ -35,6 +35,7 @@ private:
 
     void setSigmas1D(const std::vector<Sigma1d>& sigmas);
     void setSigmas2D(const std::vector<Sigma2d>& sigmas);
+    void setSigmas3D(const std::vector<Sigma3d>& sigmas);
 
     template<size_t D>
     std::vector<Sigma<D>> getList() const;
@@ -45,6 +46,7 @@ public:
     //Конструктор от списка множителей и коэффициента, который по умолчанию 1
     Expression(const std::vector<Sigma1d> &v, const Poly& r, bool imm);
     Expression(const std::vector<Sigma2d> &v, const Poly& r, bool imm);
+    Expression(const std::vector<Sigma3d> &v, const Poly& r, bool imm);
     //Конструктор для загрузки из сериализованного представления
     Expression(const std::vector<uint8_t>& data, size_t& ptr);
     

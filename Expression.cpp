@@ -73,6 +73,10 @@ Expression::Expression(const std::string& s)
         assert(lst1.empty());
         assert(lst3.empty());
         setSigmas2D(lst2);
+    } else if(!lst3.empty()) {
+        assert(lst1.empty());
+        assert(lst2.empty());
+        setSigmas3D(lst3);
     }
 }
 
@@ -98,6 +102,13 @@ Expression::Expression(const std::vector<Sigma2d> &v, const Poly& r, bool imm) {
     im = imm;
     dim = 2;
     setSigmas2D(v);
+    poly = r;
+}
+
+Expression::Expression(const std::vector<Sigma3d> &v, const Poly& r, bool imm) {
+    im = imm;
+    dim = 3;
+    setSigmas3D(v);
     poly = r;
 }
 
@@ -135,6 +146,28 @@ void Expression::setSigmas2D(const std::vector<Sigma2d>& sigmas) {
     for (int i = 0; i < (int)tmp.size(); i++) {
         sigmaCoords.push_back(tmp[i].getPoint().p[0]);
         sigmaCoords.push_back(tmp[i].getPoint().p[1]);
+        if(tmp[i].getC() == 1)
+            numSigmaX++;
+        else if(tmp[i].getC() == 2)
+            numSigmaY++;
+    }
+}
+
+void Expression::setSigmas3D(const std::vector<Sigma3d>& sigmas) {
+    numSigmaX = 0;
+    numSigmaY = 0;
+    sigmaCoords.clear();
+    
+    auto tmp = sigmas;
+    std::sort(tmp.begin(), tmp.end(), [&](const Sigma3d& ptr1, const Sigma3d& ptr2) {
+        if(ptr1.getC() != ptr2.getC())
+            return ptr1.getC() < ptr2.getC();
+        return ptr1.getPoint() < ptr2.getPoint();
+    });
+    for (int i = 0; i < (int)tmp.size(); i++) {
+        sigmaCoords.push_back(tmp[i].getPoint().p[0]);
+        sigmaCoords.push_back(tmp[i].getPoint().p[1]);
+        sigmaCoords.push_back(tmp[i].getPoint().p[2]);
         if(tmp[i].getC() == 1)
             numSigmaX++;
         else if(tmp[i].getC() == 2)
@@ -310,8 +343,8 @@ void Expression::Commute(const Expression& O, std::function<void(Expression&& ne
         commuteImpl<1>(*this, O, callback);
     else if(dim == 2)
         commuteImpl<2>(*this, O, callback);
-    //else
-    //    commuteImpl<3>(*this, O, callback);
+    else
+        commuteImpl<3>(*this, O, callback);
 }
 
 bool Expression::operator==(const Expression &ex1) const {
