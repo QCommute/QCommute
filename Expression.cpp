@@ -68,15 +68,15 @@ Expression::Expression(const std::string& s)
     if(!lst1.empty()) {
         assert(lst2.empty());
         assert(lst3.empty());
-        setSigmas1D(lst1);
+        setSigmas1D(lst1.data(), lst1.size());
     } else if(!lst2.empty()) {
         assert(lst1.empty());
         assert(lst3.empty());
-        setSigmas2D(lst2);
+        setSigmas2D(lst2.data(), lst2.size());
     } else if(!lst3.empty()) {
         assert(lst1.empty());
         assert(lst2.empty());
-        setSigmas3D(lst3);
+        setSigmas3D(lst3.data(), lst3.size());
     }
 }
 
@@ -91,33 +91,33 @@ Expression::Expression(const std::vector<uint8_t>& data, size_t& ptr) {
     poly = Poly(data, ptr);
 }
 
-Expression::Expression(const std::vector<Sigma1d> &v, const Poly& r, bool imm) {
+Expression::Expression(const Sigma<1>* v, size_t vSize, const Poly& r, bool imm) {
     im = imm;
     dim = 1;
-    setSigmas1D(v);
+    setSigmas1D(v, vSize);
     poly = r;
 }
 
-Expression::Expression(const std::vector<Sigma2d> &v, const Poly& r, bool imm) {
+Expression::Expression(const Sigma<2>* v, size_t vSize, const Poly& r, bool imm) {
     im = imm;
     dim = 2;
-    setSigmas2D(v);
+    setSigmas2D(v, vSize);
     poly = r;
 }
 
-Expression::Expression(const std::vector<Sigma3d> &v, const Poly& r, bool imm) {
+Expression::Expression(const Sigma<3>* v, size_t vSize, const Poly& r, bool imm) {
     im = imm;
     dim = 3;
-    setSigmas3D(v);
+    setSigmas3D(v, vSize);
     poly = r;
 }
 
-void Expression::setSigmas1D(const std::vector<Sigma1d>& sigmas) {
+void Expression::setSigmas1D(const Sigma<1>* sigmas, size_t sigmasSize) {
     numSigmaX = 0;
     numSigmaY = 0;
     sigmaCoords.clear();
     
-    auto tmp = sigmas;
+    std::vector<Sigma1d> tmp(sigmas, sigmas + sigmasSize);
     std::sort(tmp.begin(), tmp.end(), [&](const Sigma1d& ptr1, const Sigma1d& ptr2) {
         if(ptr1.getC() != ptr2.getC())
             return ptr1.getC() < ptr2.getC();
@@ -132,12 +132,12 @@ void Expression::setSigmas1D(const std::vector<Sigma1d>& sigmas) {
     }
 }
 
-void Expression::setSigmas2D(const std::vector<Sigma2d>& sigmas) {
+void Expression::setSigmas2D(const Sigma<2>* sigmas, size_t sigmasSize) {
     numSigmaX = 0;
     numSigmaY = 0;
     sigmaCoords.clear();
     
-    auto tmp = sigmas;
+    std::vector<Sigma2d> tmp(sigmas, sigmas + sigmasSize);
     std::sort(tmp.begin(), tmp.end(), [&](const Sigma2d& ptr1, const Sigma2d& ptr2) {
         if(ptr1.getC() != ptr2.getC())
             return ptr1.getC() < ptr2.getC();
@@ -153,12 +153,12 @@ void Expression::setSigmas2D(const std::vector<Sigma2d>& sigmas) {
     }
 }
 
-void Expression::setSigmas3D(const std::vector<Sigma3d>& sigmas) {
+void Expression::setSigmas3D(const Sigma<3>* sigmas, size_t sigmasSize) {
     numSigmaX = 0;
     numSigmaY = 0;
     sigmaCoords.clear();
     
-    auto tmp = sigmas;
+    std::vector<Sigma3d> tmp(sigmas, sigmas + sigmasSize);
     std::sort(tmp.begin(), tmp.end(), [&](const Sigma3d& ptr1, const Sigma3d& ptr2) {
         if(ptr1.getC() != ptr2.getC())
             return ptr1.getC() < ptr2.getC();
@@ -259,72 +259,71 @@ void commuteImpl(const Expression& O1, const Expression& O2,std::function<void(E
             }
 
             // строим список сигм, отсортированный по точке
+            // сигмы, попавшие в одну точку, схлопываются
             Point<D> pd = s11.getPoint() - s1.getPoint();
             Point<D> deltaLst1 = -Point<D>::elementwiseMin(pd, Point<D>()), deltaLst = Point<D>::elementwiseMax(Point<D>(), pd);
             size_t lst3Size = 0;
             size_t ptr = 0, ptr1 = 0;
+            int nn = 0;
             while(ptr < lst.size() || ptr1 < lst1.size()) {
                 if(ptr1 == j)
                     ptr1++;
-                else if(ptr1 < lst1.size() && (ptr == lst.size() || (lst1[ptr1].getPoint() + deltaLst1 < lst[ptr].getPoint() + deltaLst))) {
-                    Sigma<D> t = lst1[ptr1];
-                    t.setPoint(t.getPoint() + deltaLst1);
-                    lst3[lst3Size++] = t;
-                    ptr1++;
-                } else {
-                    Sigma<D> t = lst[ptr];
-                    if (ptr==i)
-                        t.setC(nc);
-                    t.setPoint(t.getPoint() + deltaLst);
-                    lst3[lst3Size++] = t;
-                    ptr++;
+                else {
+                    Sigma<D> t;
+                    if(ptr1 < lst1.size() && (ptr == lst.size() || (lst1[ptr1].getPoint() + deltaLst1 < lst[ptr].getPoint() + deltaLst))) {
+                        t = lst1[ptr1];
+                        t.setPoint(t.getPoint() + deltaLst1);
+                        ptr1++;
+                    } else {
+                        t = lst[ptr];
+                        if (ptr==i)
+                            t.setC(nc);
+                        t.setPoint(t.getPoint() + deltaLst);
+                        ptr++;
+                    }
+
+                    if(lst3Size > 0 && lst3[lst3Size - 1].getPoint() == t.getPoint()) {
+                        if(lst3[lst3Size - 1].getC() == t.getC())
+                            lst3Size--;
+                        else {
+                            nn++;
+                            int nc2 = LeviChivita(lst3[lst3Size - 1].getC(), t.getC());
+                            imm++;
+                            if (nc2 < 0) {
+                                nc2 = -nc2;
+                                imm += 2;
+                            }
+                            lst3[lst3Size - 1].setC(nc2);
+                        }
+                    } else
+                        lst3[lst3Size++] = t;
                 }
             }
 
-            // ??? схлопываем сигмы, попавшие в одну точку
-            int nn=0;
-            std::vector<Sigma<D>> lst32;
-            for(size_t k = 0; k < lst3Size; k++) {
-                if(!lst32.empty() && lst32.back().getPoint() == lst3[k].getPoint()) {
-                    if(lst32.back().getC() == lst3[k].getC())
-                        lst32.pop_back();
-                    else {
-                        nn++;
-                        int nc2 = LeviChivita(lst32.back().getC(), lst3[k].getC());
-                        imm++;
-                        if (nc2 < 0) {
-                            nc2 = -nc2;
-                            imm += 2;
-                        }
-                        lst32.back().setC(nc2);
-                    }
-                } else
-                    lst32.push_back(lst3[k]);
-            }
             if ((nn % 2) != 0) {
                 continue;
             }
 
             // ??? сдвигаем минимум в точку 1
-            if(!lst32.empty()) {
-                Point<D> mp = lst32[0].getPoint();
-                for(size_t k = 1; k < lst32.size(); k++)
-                    mp = Point<D>::elementwiseMin(mp, lst32[k].getPoint());
+            if(lst3Size > 0) {
+                Point<D> mp = lst3[0].getPoint();
+                for(size_t k = 1; k < lst3Size; k++)
+                    mp = Point<D>::elementwiseMin(mp, lst3[k].getPoint());
 
                 Point<D> delta;
                 for(size_t k = 0; k < D; k++)
                     delta.p[k] = (mp.p[k] > 1) ? (-mp.p[k] + 1) : 0;
-                for(size_t k = 0; k < lst32.size(); k++)
-                    lst32[k].setPoint(lst32[k].getPoint() + delta);
+                for(size_t k = 0; k < lst3Size; k++)
+                    lst3[k].setPoint(lst3[k].getPoint() + delta);
             }
 
             // ??? создаем новое выражение
             imm = imm % 4;
             if(imm == 2 || imm == 3) {
-                Expression O1(lst32, pol1 * (-1), (imm % 2) == 1);
+                Expression O1(lst3, lst3Size, pol1 * (-1), (imm % 2) == 1);
                 callback(std::move(O1));
             } else {
-                Expression O1(lst32, pol1, (imm % 2) == 1);
+                Expression O1(lst3, lst3Size, pol1, (imm % 2) == 1);
                 callback(std::move(O1));
             }
         }
