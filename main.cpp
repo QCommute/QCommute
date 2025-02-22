@@ -205,6 +205,7 @@ main(int argc, char** argv)
         storeBlock(getPathToHashTableFile(0, i), cur);
     }
 
+    double prevExpansionRatio = H.size();
     for(int32_t t = 0; t < n; t++) {
         std::cerr << "Этап " << t + 1 << std::endl;
         if(!std::filesystem::exists(directoryPath + "/" + std::to_string(t + 1))) {
@@ -213,7 +214,7 @@ main(int argc, char** argv)
         }
 
         auto timeLayerStart = Clock::now();
-        size_t tableSize = H.size() * O_size;
+        size_t tableSize = std::max((size_t)1, (size_t)std::ceil(prevExpansionRatio * O_size));
         Node** indices = new Node*[tableSize];
         for(size_t i = 0; i < tableSize; i++)
             indices[i] = nullptr;
@@ -267,7 +268,9 @@ main(int argc, char** argv)
                   << std::chrono::duration_cast<std::chrono::microseconds>(timeLayerEnd - timeLayerStart).count() / 1000000.0 << " сек" << std::endl;
         
         // Сохраняем новый слой на диск и удаляем его из памяти
+        size_t O_size_prev = O_size;
         O_size = moveHashTableToDisk(t + 1, tableSize, indices);
+        prevExpansionRatio = (double)O_size / O_size_prev;
 
         delete[] indices;
         prevTableSize = tableSize;
