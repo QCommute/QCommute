@@ -4,26 +4,14 @@
 #include <fstream>
 #include <algorithm>
 #include <string>
-#include <memory>
 #include <iostream>
 #include <cassert>
 #include <ctime>
-#include <typeinfo>
-#include <typeindex>
-#include <cmath>
 #include <cstdio>
-#include <bitset>
 #include "Expression.h"
-//#include <conio.h>
 #include <thread>
 #include <mutex>
-#include <omp.h>
-#include <stdio.h>
-#include <gmpxx.h>
 #include <filesystem>
-//#include <ginac/ginac.h>
-#include <unordered_map>
-#include <set>
 #include <unordered_set>
 
 struct Node {
@@ -36,6 +24,11 @@ struct Node {
 };
 
 #define BLOCK_SIZE 512
+
+std::string directoryPath;
+std::string getPathToHashTableFile(size_t level, size_t start) {
+    return directoryPath + "/" + std::to_string(level) + "/" + std::to_string(start) + ".comm";
+}
 
 std::vector<uint8_t> loadFile(const std::string& path) {
     std::ifstream stream(path, std::ios::binary);
@@ -65,10 +58,6 @@ std::vector<Expression> loadAndDeleteBlock(const std::string& path) {
     return res;
 }
 
-std::vector<Expression> loadAndDeleteHashTableBlock(const std::string& dir, size_t level, size_t start) {
-    return loadAndDeleteBlock(dir + "/" + std::to_string(level) + "/" + std::to_string(start) + ".comm");
-}
-
 void storeBlock(const std::string& path, const std::vector<Expression>& exprs) {
     std::vector<uint8_t> data;
     for(size_t i = 0; i < exprs.size(); i++)
@@ -76,7 +65,7 @@ void storeBlock(const std::string& path, const std::vector<Expression>& exprs) {
     storeFile(path, data);
 }
 
-size_t moveHashTableBlockToDisk(const std::string& dir, size_t level, size_t start, size_t tableSize, Node** indices) {
+size_t moveHashTableBlockToDisk(size_t level, size_t start, size_t tableSize, Node** indices) {
     std::vector<Expression> exprs;
     for(size_t i = start; i < std::min(start + BLOCK_SIZE, tableSize); i++) {
         Node* cur_node = indices[i];
@@ -89,11 +78,10 @@ size_t moveHashTableBlockToDisk(const std::string& dir, size_t level, size_t sta
         }
         indices[i] = nullptr;
     }
-    storeBlock(dir + "/" + std::to_string(level) + "/" + std::to_string(start) + ".comm", exprs);
+    storeBlock(getPathToHashTableFile(level, start), exprs);
     return exprs.size();
 }
 
-std::string directoryPath;
 typedef std::chrono::high_resolution_clock Clock;
 
 size_t moveHashTableToDisk(size_t level, size_t tableSize, Node** indices) {
@@ -113,7 +101,7 @@ size_t moveHashTableToDisk(size_t level, size_t tableSize, Node** indices) {
                 nextHash += BLOCK_SIZE;
                 lock.unlock();
 
-                size_t added = moveHashTableBlockToDisk(directoryPath, level, curHash, tableSize, indices);
+                size_t added = moveHashTableBlockToDisk(level, curHash, tableSize, indices);
 
                 std::lock_guard<std::mutex> lock2(resMutex);
                 O_size += added;
@@ -170,44 +158,41 @@ main(int argc, char** argv)
     }
     
     directoryPath = "./tmp"; //место где хранится файлы с коммутаторами
-    //std::cout << sizeof(Sigma2d)<< std::endl;
-    auto start_time = Clock::now();//просто часы чтобы мерить время исполнения
+    auto timeStart = Clock::now();//просто часы чтобы мерить время исполнения
     setlocale(LC_ALL, "");
-    std::vector <Expression> H;//Переменная Гамильтониана
-    std::vector<Expression> O_start;//Переменная Наблюдаемой
+    
+    std::vector<Expression> H; //Переменная Гамильтониана
+    std::vector<Expression> O_start; //Переменная Наблюдаемой
     size_t O_size = 0;
     
-    std::ifstream file(argv[1], std::ifstream::in);//огткрфваем файл в котором содерижится наблюдаемая и гамильтониан
+    std::ifstream file(argv[1], std::ifstream::in); //Открываем файл в котором содерижится наблюдаемая и гамильтониан
     std::string str;
+
+    // Гамильтониан
     std::getline(file, str);
-    if (str=="H:"){
-        std::getline(file, str); 
-    }
-    else{
-        assert(0);
-    }
-    while(str!="O:") {
-        Expression t(str);//Создаем из строчки выражение для гамильтониана 
-        H.push_back(t);//и помещаем в список
+    assert(str == "H:");
+
+    std::getline(file, str); 
+    while(str != "O:") {
+        H.emplace_back(str);
         std::getline(file, str);
     }
-    //std::getline(file, str);
-    if (str=="O:"){
-        std::getline(file, str);
-    }
-    else{
-        assert(0);
-    }
-    while(str!="n:") {
+
+    // Наблюдаемая
+    assert(str == "O:");
+
+    std::getline(file, str);
+    while(str != "n:") {
         O_start.emplace_back(str);
         O_size++;
         std::getline(file, str);
     }
+
+    // Число коммутаторов
+    assert(str == "n:");
     std::getline(file, str);
-    if (str=="n:"){
-        std::getline(file, str);
-    }
     int n = std::stoi(str);
+    
     file.close();
     std::cerr << "Файл считан корректно"<< std::endl;
 
@@ -217,7 +202,7 @@ main(int argc, char** argv)
     size_t prevTableSize = O_start.size();
     for(size_t i = 0; i < O_start.size(); i += BLOCK_SIZE) {
         std::vector<Expression> cur(O_start.begin() + i, O_start.begin() + std::min(O_start.size(), i + BLOCK_SIZE));
-        storeBlock(directoryPath + "/0/" + std::to_string(i) + ".comm", cur);
+        storeBlock(getPathToHashTableFile(0, i), cur);
     }
 
     for(int32_t t = 0; t < n; t++) {
@@ -227,7 +212,7 @@ main(int argc, char** argv)
             std::cerr << "Создана директория: " << t + 1 << std::endl;
         }
 
-        auto time2 = Clock::now();
+        auto timeLayerStart = Clock::now();
         size_t tableSize = H.size() * O_size;
         Node** indices = new Node*[tableSize];
         for(size_t i = 0; i < tableSize; i++)
@@ -249,7 +234,7 @@ main(int argc, char** argv)
                     nextHash += BLOCK_SIZE;
                     lock.unlock();
                     
-                    std::vector<Expression> expressionsCur = loadAndDeleteHashTableBlock(directoryPath, t, curHash);
+                    std::vector<Expression> expressionsCur = loadAndDeleteBlock(getPathToHashTableFile(t, curHash));
                     
                     for (size_t i = 0; i < H.size(); i++)
                         for(size_t j = 0; j < expressionsCur.size(); j++)
@@ -277,8 +262,9 @@ main(int argc, char** argv)
             threads[j].join();
         
         delete[] indexMutexes;
-        auto time3 = Clock::now();
-        std::cerr << "Подсчет коммутаторов и приведение подобных: " << (std::chrono::duration_cast<std::chrono::microseconds>(time3 - time2).count())/1000000.0 << " сек" << std::endl;
+        auto timeLayerEnd = Clock::now();
+        std::cerr << "Подсчет коммутаторов и приведение подобных: "
+                  << std::chrono::duration_cast<std::chrono::microseconds>(timeLayerEnd - timeLayerStart).count() / 1000000.0 << " сек" << std::endl;
         
         // Сохраняем новый слой на диск и удаляем его из памяти
         O_size = moveHashTableToDisk(t + 1, tableSize, indices);
@@ -288,15 +274,16 @@ main(int argc, char** argv)
     
         std::cerr << std::endl;
     }
+
+    auto timeEnd = Clock::now();
+    std::cerr << "Вычисление заняло " << std::chrono::duration_cast<std::chrono::microseconds>(timeEnd - timeStart).count() / 1000000.0 << " сек" << std::endl;
     
     //вывод результата, пока он делается просто на экран
     for(size_t i = 0; i < prevTableSize; i += BLOCK_SIZE)
-        for(const auto& expr : loadAndDeleteHashTableBlock(directoryPath, n, i))
+        for(const auto& expr : loadAndDeleteBlock(getPathToHashTableFile(n, i)))
             expr.print();
 
-auto time1 = Clock::now();
-std::cerr << "Вычисление заняло "<< (std::chrono::duration_cast<std::chrono::microseconds>(time1 - start_time).count())/1000000.0 << " сек" << std::endl;
-//    getc(stdin);
-//    getc(stdin);
-        return 0;
+    auto timeFinish = Clock::now();
+    std::cerr << "Вывод занял " << std::chrono::duration_cast<std::chrono::microseconds>(timeFinish - timeEnd).count() / 1000000.0 << " сек" << std::endl;
+    return 0;
 }
