@@ -202,6 +202,7 @@ main(int argc, char** argv)
     size_t prevTableSize = O_start.size();
     for(size_t i = 0; i < O_start.size(); i += BLOCK_SIZE) {
         std::vector<Expression> cur(O_start.begin() + i, O_start.begin() + std::min(O_start.size(), i + BLOCK_SIZE));
+        std::sort(cur.begin(), cur.end());
         storeBlock(getPathToHashTableFile(0, i), cur);
     }
 
@@ -242,6 +243,7 @@ main(int argc, char** argv)
                             H[i].Commute(expressionsCur[j], [&](Expression&& newExpression) {
                                 size_t hash = ExpressionHasher()(newExpression);
                                 std::lock_guard<std::mutex> guard(indexMutexes[(hash % tableSize) / 16]);
+                                Node* prev_node = nullptr;
                                 Node* cur_node = indices[hash % tableSize];
                                 bool found = false;
                                 while(cur_node != nullptr) {
@@ -249,11 +251,16 @@ main(int argc, char** argv)
                                         cur_node->expr.getPoly() += newExpression.getPoly();
                                         found = true;
                                         break;
-                                    }
+                                    } else if(newExpression < cur_node->expr)
+                                        break;
+                                    prev_node = cur_node;
                                     cur_node = cur_node->next;
                                 }
                                 if(!found) {
-                                    indices[hash % tableSize] = new Node(std::move(newExpression), indices[hash % tableSize]);
+                                    if(prev_node == nullptr)
+                                        indices[hash % tableSize] = new Node(std::move(newExpression), indices[hash % tableSize]);
+                                    else
+                                        prev_node->next = new Node(std::move(newExpression), cur_node);
                                 }
                             }); //коммутируем все салгаемые с гамильтонанном.
                 }

@@ -52,6 +52,7 @@ public:
     
     void Commute(const Expression& O, std::function<void(Expression&& newExpression)> callback);
     bool operator==(const Expression &ex1) const;
+    bool operator<(const Expression &ex1) const;
     Poly& getPoly();
     const Poly& getPoly() const;
     

@@ -361,6 +361,23 @@ bool Expression::operator==(const Expression &ex1) const {
     return sigmaCoords == ex1.sigmaCoords;
 }
 
+bool Expression::operator<(const Expression &ex1) const {
+    if (im != ex1.im)
+        return im;
+    if(numSigmaX != ex1.numSigmaX)
+        return numSigmaX < ex1.numSigmaX;
+    if(numSigmaY != ex1.numSigmaY)
+        return numSigmaY < ex1.numSigmaY;
+    
+    if(sigmaCoords.empty() != ex1.sigmaCoords.empty())
+        return sigmaCoords.empty();
+
+    if(dim != ex1.dim)
+        return dim < ex1.dim;
+    // Сигмы хранятся в отсортированном порядке, поэтому достаточно сравнить вектора координат
+    return sigmaCoords < ex1.sigmaCoords;
+}
+
 int LeviChivita(int i, int j){
 if (i==1){
     if (j==2){
