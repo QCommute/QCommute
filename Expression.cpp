@@ -225,6 +225,7 @@ void commuteImpl(const Expression& O1, const Expression& O2,std::function<void(E
     //работа с полиномами, а именно их умножение
     Poly pol1 = O1.poly * O2.poly;
     pol1 *= 2;
+    Poly m_pol1 = pol1 * (-1);
     
     //отсюда начинается сама коммутация в прицнипе тут осбо модно ничего не комментировать главное то как записывается результат в конце , там будет комментарий
     std::vector<Sigma<D>> lst = O1.getList<D>();
@@ -320,7 +321,7 @@ void commuteImpl(const Expression& O1, const Expression& O2,std::function<void(E
             // ??? создаем новое выражение
             imm = imm % 4;
             if(imm == 2 || imm == 3) {
-                Expression O1(lst3, lst3Size, pol1 * (-1), (imm % 2) == 1);
+                Expression O1(lst3, lst3Size, m_pol1, (imm % 2) == 1);
                 callback(std::move(O1));
             } else {
                 Expression O1(lst3, lst3Size, pol1, (imm % 2) == 1);
