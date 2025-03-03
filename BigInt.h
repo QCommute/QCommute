@@ -14,7 +14,7 @@ public:
     
     BigInt(const BigInt& other);
     BigInt& operator=(const BigInt& other);
-    BigInt(BigInt&& other);
+    BigInt(BigInt&& other) __GMP_NOTHROW;
     BigInt& operator=(BigInt&& other);
 
     bool operator==(const BigInt& other) const;

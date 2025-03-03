@@ -33,15 +33,15 @@ BigInt& BigInt::operator=(const BigInt& other) {
     return *this;
 }
 
-BigInt::BigInt(BigInt&& other) {
+BigInt::BigInt(BigInt&& other) __GMP_NOTHROW {
     mpz_init(data_);
-    mpz_set(data_, other.data_);
+    mpz_swap(data_, other.data_);
 }
 
 BigInt& BigInt::operator=(BigInt&& other) {
     if(this == &other)
         return *this;
-    mpz_set(data_, other.data_);
+    mpz_swap(data_, other.data_);
     return *this;
 }
 
