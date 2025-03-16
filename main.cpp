@@ -13,6 +13,7 @@
 #include <mutex>
 #include <filesystem>
 #include <unordered_set>
+#include <sys/wait.h>
 
 struct Node {
     Expression expr;
@@ -115,14 +116,17 @@ size_t moveHashTableToDisk(size_t level, size_t tableSize, Node** indices) {
 }
 
 struct ComputationResult {
-    size_t O_size;  
+    size_t O_size;
 };
 
-ComputationResult computePartOfNextLayer(const std::vector<Expression>& H, size_t prevTableSize,
-                            size_t curLevelNum, size_t curTableSize,
-                            size_t minHash = 0, size_t maxHash = std::numeric_limits<size_t>::max()) {
+ComputationResult computePartOfNextLayerImpl(const std::vector<Expression>& H, size_t prevTableSize,
+                                             size_t curLevelNum, size_t curTableSize,
+                                             size_t minHash, size_t maxHash) {
+    assert(minHash % BLOCK_SIZE == 0);
+    assert(maxHash >= curTableSize || maxHash % BLOCK_SIZE == 0);
+    assert(maxHash > minHash);
+    
     auto timeLayerStart = Clock::now();
-    //size_t tableSize = std::max((size_t)1, (size_t)std::ceil(prevExpansionRatio * O_size));
     Node** indices = new Node*[curTableSize];
     for(size_t i = 0; i < curTableSize; i++)
         indices[i] = nullptr;
@@ -189,6 +193,40 @@ ComputationResult computePartOfNextLayer(const std::vector<Expression>& H, size_
     delete[] indices;
     
     return {O_size};
+}
+
+ComputationResult computePartOfNextLayer(const std::vector<Expression>& H, size_t prevTableSize,
+                                         size_t curLevelNum, size_t curTableSize,
+                                         size_t minHash = 0, size_t maxHash = std::numeric_limits<size_t>::max()) {
+    int pipefd[2];
+    pipe2(pipefd, 0);
+    
+    int fork_res = fork();
+    if(fork_res == 0) {
+        close(pipefd[0]);
+
+        ComputationResult res = computePartOfNextLayerImpl(H, prevTableSize, curLevelNum, curTableSize, minHash, maxHash);
+
+        ssize_t written = 0;
+        while(written < sizeof(ComputationResult))
+            written += write(pipefd[1], (char*)(&res) + written, sizeof(ComputationResult) - written);
+        exit(0);
+    } else {
+        close(pipefd[1]);
+
+        int wstatus;
+        waitpid(fork_res, &wstatus, 0);
+        if(!(WIFEXITED(wstatus) && WEXITSTATUS(wstatus) == 0)) {
+            std::cerr << "Не удалось корректно завершить вычисления" << std::endl;
+            exit(1);
+        }
+
+        ComputationResult res;
+        ssize_t read_ = 0;
+        while(read_ < sizeof(ComputationResult))
+            read_ += read(pipefd[0], (char*)(&res) + read_, sizeof(ComputationResult) - read_);
+        return res;
+    }
 }
 
 int
