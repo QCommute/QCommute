@@ -333,7 +333,7 @@ void commuteImpl(const Expression& O1, const Expression& O2,std::function<void(E
 }
 
 //самый главный оператор (коммутатор списка с элементов)
-void Expression::Commute(const Expression& O, std::function<void(Expression&& newExpression)> callback) {
+void Expression::Commute(const Expression& O, std::function<void(Expression&& newExpression)> callback) const {
     if(sigmaCoords.empty() || O.sigmaCoords.empty())
         return;
     assert(dim == O.dim);

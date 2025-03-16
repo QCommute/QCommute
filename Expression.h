@@ -50,7 +50,7 @@ public:
     //Конструктор для загрузки из сериализованного представления
     Expression(const std::vector<uint8_t>& data, size_t& ptr);
     
-    void Commute(const Expression& O, std::function<void(Expression&& newExpression)> callback);
+    void Commute(const Expression& O, std::function<void(Expression&& newExpression)> callback) const;
     bool operator==(const Expression &ex1) const;
     bool operator<(const Expression &ex1) const;
     Poly& getPoly();

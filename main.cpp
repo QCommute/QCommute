@@ -114,6 +114,83 @@ size_t moveHashTableToDisk(size_t level, size_t tableSize, Node** indices) {
     return O_size;
 }
 
+struct ComputationResult {
+    size_t O_size;  
+};
+
+ComputationResult computePartOfNextLayer(const std::vector<Expression>& H, size_t prevTableSize,
+                            size_t curLevelNum, size_t curTableSize,
+                            size_t minHash = 0, size_t maxHash = std::numeric_limits<size_t>::max()) {
+    auto timeLayerStart = Clock::now();
+    //size_t tableSize = std::max((size_t)1, (size_t)std::ceil(prevExpansionRatio * O_size));
+    Node** indices = new Node*[curTableSize];
+    for(size_t i = 0; i < curTableSize; i++)
+        indices[i] = nullptr;
+    std::mutex* indexMutexes = new std::mutex[(curTableSize + 15) / 16];
+    
+    size_t nextHash = 0;
+    std::mutex taskMutex;
+    
+    std::vector<std::thread> threads;
+    size_t num_threads = std::thread::hardware_concurrency();
+    for(size_t tt = 0; tt < num_threads; tt++) {
+        threads.emplace_back([&nextHash, prevTableSize, &taskMutex, indices, curTableSize, indexMutexes, &H, curLevelNum, minHash, maxHash] () {
+            while(true) {
+                std::unique_lock<std::mutex> lock(taskMutex);
+                if(nextHash >= prevTableSize)
+                    return;
+                size_t curHash = nextHash;
+                nextHash += BLOCK_SIZE;
+                lock.unlock();
+                
+                std::vector<Expression> expressionsCur = loadAndDeleteBlock(getPathToHashTableFile(curLevelNum - 1, curHash));
+                
+                for (size_t i = 0; i < H.size(); i++)
+                    for(size_t j = 0; j < expressionsCur.size(); j++)
+                        H[i].Commute(expressionsCur[j], [&](Expression&& newExpression) {
+                            size_t hash = ExpressionHasher()(newExpression);
+                            if(hash < minHash || hash >= maxHash)
+                                return;
+                            std::lock_guard<std::mutex> guard(indexMutexes[(hash % curTableSize) / 16]);
+                            Node* prev_node = nullptr;
+                            Node* cur_node = indices[hash % curTableSize];
+                            bool found = false;
+                            while(cur_node != nullptr) {
+                                if(cur_node->expr == newExpression) {
+                                    cur_node->expr.getPoly() += newExpression.getPoly();
+                                    found = true;
+                                    break;
+                                } else if(newExpression < cur_node->expr)
+                                    break;
+                                prev_node = cur_node;
+                                cur_node = cur_node->next;
+                            }
+                            if(!found) {
+                                if(prev_node == nullptr)
+                                    indices[hash % curTableSize] = new Node(std::move(newExpression), indices[hash % curTableSize]);
+                                else
+                                    prev_node->next = new Node(std::move(newExpression), cur_node);
+                            }
+                        }); //коммутируем все салгаемые с гамильтонанном.
+            }
+        });
+    }
+    for(size_t j = 0; j < threads.size(); j++)
+        threads[j].join();
+        
+    delete[] indexMutexes;
+    auto timeLayerEnd = Clock::now();
+    std::cerr << "Подсчет коммутаторов и приведение подобных: "
+              << std::chrono::duration_cast<std::chrono::microseconds>(timeLayerEnd - timeLayerStart).count() / 1000000.0 << " сек" << std::endl;
+    std::cerr << std::endl;
+    
+    // Сохраняем новый слой на диск и удаляем его из памяти
+    size_t O_size = moveHashTableToDisk(curLevelNum, curTableSize, indices);
+    delete[] indices;
+    
+    return {O_size};
+}
+
 int
 main(int argc, char** argv)
 {
@@ -214,75 +291,13 @@ main(int argc, char** argv)
             std::cerr << "Создана директория: " << t + 1 << std::endl;
         }
 
-        auto timeLayerStart = Clock::now();
         size_t tableSize = std::max((size_t)1, (size_t)std::ceil(prevExpansionRatio * O_size));
-        Node** indices = new Node*[tableSize];
-        for(size_t i = 0; i < tableSize; i++)
-            indices[i] = nullptr;
-        std::mutex* indexMutexes = new std::mutex[(tableSize + 15) / 16];
-
-        size_t nextHash = 0;
-        std::mutex taskMutex;
         
-        std::vector<std::thread> threads;
-        size_t num_threads = std::thread::hardware_concurrency();
-        for(size_t tt = 0; tt < num_threads; tt++) {
-            threads.emplace_back([&nextHash, prevTableSize, &taskMutex, indices, tableSize, indexMutexes, &H, t]() {
-                while(true) {
-                    std::unique_lock<std::mutex> lock(taskMutex);
-                    if(nextHash >= prevTableSize)
-                        return;
-                    size_t curHash = nextHash;
-                    nextHash += BLOCK_SIZE;
-                    lock.unlock();
-                    
-                    std::vector<Expression> expressionsCur = loadAndDeleteBlock(getPathToHashTableFile(t, curHash));
-                    
-                    for (size_t i = 0; i < H.size(); i++)
-                        for(size_t j = 0; j < expressionsCur.size(); j++)
-                            H[i].Commute(expressionsCur[j], [&](Expression&& newExpression) {
-                                size_t hash = ExpressionHasher()(newExpression);
-                                std::lock_guard<std::mutex> guard(indexMutexes[(hash % tableSize) / 16]);
-                                Node* prev_node = nullptr;
-                                Node* cur_node = indices[hash % tableSize];
-                                bool found = false;
-                                while(cur_node != nullptr) {
-                                    if(cur_node->expr == newExpression) {
-                                        cur_node->expr.getPoly() += newExpression.getPoly();
-                                        found = true;
-                                        break;
-                                    } else if(newExpression < cur_node->expr)
-                                        break;
-                                    prev_node = cur_node;
-                                    cur_node = cur_node->next;
-                                }
-                                if(!found) {
-                                    if(prev_node == nullptr)
-                                        indices[hash % tableSize] = new Node(std::move(newExpression), indices[hash % tableSize]);
-                                    else
-                                        prev_node->next = new Node(std::move(newExpression), cur_node);
-                                }
-                            }); //коммутируем все салгаемые с гамильтонанном.
-                }
-            });
-        }
-        for(size_t j = 0; j < threads.size(); j++)
-            threads[j].join();
+        ComputationResult res = computePartOfNextLayer(H, prevTableSize, t + 1, tableSize);
         
-        delete[] indexMutexes;
-        auto timeLayerEnd = Clock::now();
-        std::cerr << "Подсчет коммутаторов и приведение подобных: "
-                  << std::chrono::duration_cast<std::chrono::microseconds>(timeLayerEnd - timeLayerStart).count() / 1000000.0 << " сек" << std::endl;
-        
-        // Сохраняем новый слой на диск и удаляем его из памяти
-        size_t O_size_prev = O_size;
-        O_size = moveHashTableToDisk(t + 1, tableSize, indices);
-        prevExpansionRatio = (double)O_size / O_size_prev;
-
-        delete[] indices;
+        prevExpansionRatio = (double)res.O_size / O_size;
+        O_size = res.O_size;
         prevTableSize = tableSize;
-    
-        std::cerr << std::endl;
     }
 
     auto timeEnd = Clock::now();
