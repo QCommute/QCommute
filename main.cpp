@@ -212,13 +212,16 @@ ComputationResult computePartOfNextLayerImpl(const std::vector<Expression>& H, s
         
     delete[] indexMutexes;
     auto timeLayerEnd = Clock::now();
-    std::cerr << "Подсчет коммутаторов и приведение подобных: "
-              << std::chrono::duration_cast<std::chrono::microseconds>(timeLayerEnd - timeLayerStart).count() / 1000000.0 << " сек" << std::endl;
+    std::cerr << "\e[90m" << "Подсчет слагаемых и приведение подобных: "
+              << std::chrono::duration_cast<std::chrono::microseconds>(timeLayerEnd - timeLayerStart).count() / 1000000.0 << " сек" << "\e[0m" << std::endl;
     
     // Сохраняем новый слой на диск и удаляем его из памяти
     size_t O_size = moveHashTableToDisk(curLevelNum, indices, minHash, maxHash);
     delete[] indices;
 
+    auto timeMoveEnd = Clock::now();
+    std::cerr << "\e[90m" << "Сохранение на диск: "
+              << std::chrono::duration_cast<std::chrono::microseconds>(timeMoveEnd - timeLayerEnd).count() / 1000000.0 << " сек" << "\e[0m" << std::endl;
     return {O_size, memoryUsageEnd - memoryUsageStart};
 }
 
@@ -361,16 +364,18 @@ main(int argc, char** argv)
         std::sort(cur.begin(), cur.end());
         storeBlock(getPathToHashTableFile(0, i), cur);
     }
-    
+
     double prevExpansionRatio = H.size();
     double averageBytesPerHash = sizeof(Node) + sizeof(Node*);
+    double timeOnPrevLayer = 0;
     for(int32_t t = 0; t < n; t++) {
-        std::cerr << "Этап " << t + 1 << std::endl;
+        std::cerr << "\e[32m" << "Этап " << t + 1 << "\e[0m" << std::endl;
         if(!std::filesystem::exists(config.directoryPath + "/" + std::to_string(t + 1))) {
             std::filesystem::create_directory(config.directoryPath + "/" + std::to_string(t + 1));
             std::cerr << "Создана директория: " << t + 1 << std::endl;
         }
 
+        auto timeLayerStart = Clock::now();
         size_t tableSize = std::max((size_t)1, (size_t)std::ceil(prevExpansionRatio * O_size));
 
         size_t cur_O_size = 0;
@@ -390,6 +395,14 @@ main(int argc, char** argv)
         prevExpansionRatio = (double)cur_O_size / O_size;
         O_size = cur_O_size;
         prevTableSize = tableSize;
+
+        auto timeLayerFinish = Clock::now();
+        std::cerr << "Слой " << t + 1 << " посчитан; всего слагаемых: " << O_size << " (x" << prevExpansionRatio << " с предыдущего слоя)" << std::endl;
+        double timeOnCurLayer = std::chrono::duration_cast<std::chrono::microseconds>(timeLayerFinish - timeLayerStart).count() / 1000000.0;
+        std::cerr << "Суммарное время на слое: " << timeOnCurLayer << " сек";
+        if(t > 0)
+            std::cerr << " (x" << timeOnCurLayer / timeOnPrevLayer << " с предыдущего слоя)" << std::endl;
+        timeOnPrevLayer = timeOnCurLayer;
         std::cerr << std::endl;
     }
 
