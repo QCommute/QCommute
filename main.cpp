@@ -26,11 +26,6 @@ struct Node {
 
 #define BLOCK_SIZE 512
 
-std::string directoryPath;
-std::string getPathToHashTableFile(size_t level, size_t start) {
-    return directoryPath + "/" + std::to_string(level) + "/" + std::to_string(start) + ".comm";
-}
-
 std::vector<uint8_t> loadFile(const std::string& path) {
     std::ifstream stream(path, std::ios::binary);
     stream.seekg(0, std::ios::end);
@@ -66,10 +61,20 @@ void storeBlock(const std::string& path, const std::vector<Expression>& exprs) {
     storeFile(path, data);
 }
 
-size_t moveHashTableBlockToDisk(size_t level, size_t start, size_t tableSize, Node** indices) {
+struct Config {
+    std::string directoryPath;
+    size_t memoryLimitInBytes;
+};
+Config config;
+
+std::string getPathToHashTableFile(size_t level, size_t start) {
+    return config.directoryPath + "/" + std::to_string(level) + "/" + std::to_string(start) + ".comm";
+}
+
+size_t moveHashTableBlockToDisk(size_t level, size_t start, size_t tableSize, Node** indices, size_t tableOffset) {
     std::vector<Expression> exprs;
     for(size_t i = start; i < std::min(start + BLOCK_SIZE, tableSize); i++) {
-        Node* cur_node = indices[i];
+        Node* cur_node = indices[i - tableOffset];
         while(cur_node != nullptr) {
             Node* next_node = cur_node->next;
             if(!cur_node->expr.getPoly().isZero())
@@ -77,32 +82,30 @@ size_t moveHashTableBlockToDisk(size_t level, size_t start, size_t tableSize, No
             delete cur_node;
             cur_node = next_node;
         }
-        indices[i] = nullptr;
+        indices[i - tableOffset] = nullptr;
     }
     storeBlock(getPathToHashTableFile(level, start), exprs);
     return exprs.size();
 }
 
-typedef std::chrono::high_resolution_clock Clock;
-
-size_t moveHashTableToDisk(size_t level, size_t tableSize, Node** indices) {
+size_t moveHashTableToDisk(size_t level, Node** indices, size_t minHash, size_t maxHash) {
     size_t O_size = 0;
-    size_t nextHash = 0;
+    size_t nextHash = minHash;
     std::mutex taskMutex, resMutex;
     
     std::vector<std::thread> threads;
     size_t num_threads = std::thread::hardware_concurrency();
     for(size_t tt = 0; tt < num_threads; tt++) {
-        threads.emplace_back([&nextHash, &O_size, &taskMutex, &resMutex, indices, tableSize, level]() {
+        threads.emplace_back([&nextHash, &O_size, &taskMutex, &resMutex, indices, level, minHash, maxHash]() {
             while(true) {
                 std::unique_lock<std::mutex> lock(taskMutex);
-                if(nextHash >= tableSize)
+                if(nextHash >= maxHash)
                     return;
                 size_t curHash = nextHash;
                 nextHash += BLOCK_SIZE;
                 lock.unlock();
 
-                size_t added = moveHashTableBlockToDisk(level, curHash, tableSize, indices);
+                size_t added = moveHashTableBlockToDisk(level, curHash, maxHash, indices, minHash);
 
                 std::lock_guard<std::mutex> lock2(resMutex);
                 O_size += added;
@@ -115,8 +118,29 @@ size_t moveHashTableToDisk(size_t level, size_t tableSize, Node** indices) {
     return O_size;
 }
 
+size_t getMemoryUsage() {
+    std::ifstream stream("/proc/self/status");
+    std::string str;
+    while(stream >> str) {
+        if(str == "VmRSS:") {
+            std::string value;
+            stream >> value;
+            
+            std::string suffix;
+            stream >> suffix;
+            assert(suffix == "kB");
+
+            return std::stoll(value) * 1024;
+        }
+    }
+    return 0;
+}
+
+using Clock = std::chrono::high_resolution_clock;
+
 struct ComputationResult {
     size_t O_size;
+    size_t maxMemoryUsed;
 };
 
 ComputationResult computePartOfNextLayerImpl(const std::vector<Expression>& H, size_t prevTableSize,
@@ -125,12 +149,14 @@ ComputationResult computePartOfNextLayerImpl(const std::vector<Expression>& H, s
     assert(minHash % BLOCK_SIZE == 0);
     assert(maxHash >= curTableSize || maxHash % BLOCK_SIZE == 0);
     assert(maxHash > minHash);
+
+    size_t memoryUsageStart = getMemoryUsage();
     
     auto timeLayerStart = Clock::now();
-    Node** indices = new Node*[curTableSize];
-    for(size_t i = 0; i < curTableSize; i++)
+    Node** indices = new Node*[maxHash - minHash];
+    for(size_t i = 0; i < maxHash - minHash; i++)
         indices[i] = nullptr;
-    std::mutex* indexMutexes = new std::mutex[(curTableSize + 15) / 16];
+    std::mutex* indexMutexes = new std::mutex[(maxHash - minHash + 15) / 16];
     
     size_t nextHash = 0;
     std::mutex taskMutex;
@@ -153,11 +179,11 @@ ComputationResult computePartOfNextLayerImpl(const std::vector<Expression>& H, s
                     for(size_t j = 0; j < expressionsCur.size(); j++)
                         H[i].Commute(expressionsCur[j], [&](Expression&& newExpression) {
                             size_t hash = ExpressionHasher()(newExpression);
-                            if(hash < minHash || hash >= maxHash)
+                            if(hash  % curTableSize < minHash || hash  % curTableSize >= maxHash)
                                 return;
-                            std::lock_guard<std::mutex> guard(indexMutexes[(hash % curTableSize) / 16]);
+                            std::lock_guard<std::mutex> guard(indexMutexes[(hash % curTableSize - minHash) / 16]);
                             Node* prev_node = nullptr;
-                            Node* cur_node = indices[hash % curTableSize];
+                            Node* cur_node = indices[hash % curTableSize - minHash];
                             bool found = false;
                             while(cur_node != nullptr) {
                                 if(cur_node->expr == newExpression) {
@@ -171,7 +197,7 @@ ComputationResult computePartOfNextLayerImpl(const std::vector<Expression>& H, s
                             }
                             if(!found) {
                                 if(prev_node == nullptr)
-                                    indices[hash % curTableSize] = new Node(std::move(newExpression), indices[hash % curTableSize]);
+                                    indices[hash % curTableSize - minHash] = new Node(std::move(newExpression), indices[hash % curTableSize - minHash]);
                                 else
                                     prev_node->next = new Node(std::move(newExpression), cur_node);
                             }
@@ -181,18 +207,19 @@ ComputationResult computePartOfNextLayerImpl(const std::vector<Expression>& H, s
     }
     for(size_t j = 0; j < threads.size(); j++)
         threads[j].join();
+    
+    size_t memoryUsageEnd = getMemoryUsage();
         
     delete[] indexMutexes;
     auto timeLayerEnd = Clock::now();
     std::cerr << "Подсчет коммутаторов и приведение подобных: "
               << std::chrono::duration_cast<std::chrono::microseconds>(timeLayerEnd - timeLayerStart).count() / 1000000.0 << " сек" << std::endl;
-    std::cerr << std::endl;
     
     // Сохраняем новый слой на диск и удаляем его из памяти
-    size_t O_size = moveHashTableToDisk(curLevelNum, curTableSize, indices);
+    size_t O_size = moveHashTableToDisk(curLevelNum, indices, minHash, maxHash);
     delete[] indices;
-    
-    return {O_size};
+
+    return {O_size, memoryUsageEnd - memoryUsageStart};
 }
 
 ComputationResult computePartOfNextLayer(const std::vector<Expression>& H, size_t prevTableSize,
@@ -225,6 +252,7 @@ ComputationResult computePartOfNextLayer(const std::vector<Expression>& H, size_
         ssize_t read_ = 0;
         while(read_ < sizeof(ComputationResult))
             read_ += read(pipefd[0], (char*)(&res) + read_, sizeof(ComputationResult) - read_);
+        close(pipefd[0]);
         return res;
     }
 }
@@ -271,8 +299,21 @@ main(int argc, char** argv)
         std::cout << "Файлы совпадают" << std::endl;
         return 0;
     }
+
+    // Разбираем агрументы командной строки
+    config.directoryPath = "./tmp"; //место где хранится файлы с коммутаторами 
+    config.memoryLimitInBytes = std::numeric_limits<size_t>::max();
+
+    for(int i = 2; i < argc;) {
+        if(std::string(argv[i]) == "--memory-limit") {
+            config.memoryLimitInBytes = std::stoull(argv[i + 1]) * 1'048'576;
+            i += 2;
+        } else {
+            std::cerr << "Неизвестный аргумент командной строки: \"" << argv[i] << "\"" << std::endl;
+            return 1;
+        }
+    }
     
-    directoryPath = "./tmp"; //место где хранится файлы с коммутаторами
     auto timeStart = Clock::now();//просто часы чтобы мерить время исполнения
     setlocale(LC_ALL, "");
     
@@ -312,30 +353,44 @@ main(int argc, char** argv)
     std::cerr << "Файл считан корректно"<< std::endl;
 
     // Сохраняем нулевой слой (O из входного файла) на диск
-    if(!std::filesystem::exists(directoryPath + "/0"))
-        std::filesystem::create_directory(directoryPath + "/0");
+    if(!std::filesystem::exists(config.directoryPath + "/0"))
+        std::filesystem::create_directory(config.directoryPath + "/0");
     size_t prevTableSize = O_start.size();
     for(size_t i = 0; i < O_start.size(); i += BLOCK_SIZE) {
         std::vector<Expression> cur(O_start.begin() + i, O_start.begin() + std::min(O_start.size(), i + BLOCK_SIZE));
         std::sort(cur.begin(), cur.end());
         storeBlock(getPathToHashTableFile(0, i), cur);
     }
-
+    
     double prevExpansionRatio = H.size();
+    double averageBytesPerHash = sizeof(Node) + sizeof(Node*);
     for(int32_t t = 0; t < n; t++) {
         std::cerr << "Этап " << t + 1 << std::endl;
-        if(!std::filesystem::exists(directoryPath + "/" + std::to_string(t + 1))) {
-            std::filesystem::create_directory(directoryPath + "/" + std::to_string(t + 1));
+        if(!std::filesystem::exists(config.directoryPath + "/" + std::to_string(t + 1))) {
+            std::filesystem::create_directory(config.directoryPath + "/" + std::to_string(t + 1));
             std::cerr << "Создана директория: " << t + 1 << std::endl;
         }
 
         size_t tableSize = std::max((size_t)1, (size_t)std::ceil(prevExpansionRatio * O_size));
-        
-        ComputationResult res = computePartOfNextLayer(H, prevTableSize, t + 1, tableSize);
-        
-        prevExpansionRatio = (double)res.O_size / O_size;
-        O_size = res.O_size;
+
+        size_t cur_O_size = 0;
+        size_t sumOfMemoryUsages = 0;
+        for(size_t i = 0; i < tableSize;) {
+            size_t maxNumHashes = config.memoryLimitInBytes / averageBytesPerHash;
+            size_t numHashes = std::min(tableSize - i, std::max((size_t)BLOCK_SIZE, maxNumHashes - maxNumHashes % BLOCK_SIZE));
+
+            ComputationResult res = computePartOfNextLayer(H, prevTableSize, t + 1, tableSize, i, i + numHashes);
+
+            cur_O_size += res.O_size;
+            sumOfMemoryUsages += res.maxMemoryUsed;
+            averageBytesPerHash = std::max((double)sumOfMemoryUsages / (i + numHashes), (double)(sizeof(Node) + sizeof(Node*)));
+            i += numHashes;
+        }
+
+        prevExpansionRatio = (double)cur_O_size / O_size;
+        O_size = cur_O_size;
         prevTableSize = tableSize;
+        std::cerr << std::endl;
     }
 
     auto timeEnd = Clock::now();
