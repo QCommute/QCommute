@@ -1,3 +1,4 @@
+//#include <bits/fs_dir.h>
 #include <cstdint>
 #include <vector>
 #include <chrono>
@@ -222,7 +223,7 @@ ComputationResult computePartOfNextLayerImpl(const std::vector<Expression>& H, s
     auto timeMoveEnd = Clock::now();
     std::cerr << "\e[90m" << "Сохранение на диск: "
               << std::chrono::duration_cast<std::chrono::microseconds>(timeMoveEnd - timeLayerEnd).count() / 1000000.0 << " сек" << "\e[0m" << std::endl;
-    return {O_size, memoryUsageEnd - memoryUsageStart};
+    return {O_size, (memoryUsageEnd >= memoryUsageStart) ? (memoryUsageEnd - memoryUsageStart) : 0};
 }
 
 ComputationResult computePartOfNextLayer(const std::vector<Expression>& H, size_t prevTableSize,
@@ -300,6 +301,57 @@ main(int argc, char** argv)
             remain_src.erase(it);
         }
         std::cout << "Файлы совпадают" << std::endl;
+        return 0;
+    } else if(std::string(argv[1]) == "momentum") {
+        if(argc <= 2) {
+            std::cout << "Необходимо указать путь к посчитанным коммутаторам" << std::endl;
+            return 1;
+        }
+        std::string directoryPath(argv[2]);
+
+        for(size_t i = 0; ; i++) {
+            std::string layerPath = directoryPath + "/" + std::to_string(i);
+            if(!std::filesystem::exists(layerPath))
+                return 0;
+
+            std::cerr << "\e[32m" << "Этап " << i << "\e[0m" << std::endl;
+            auto timeLayerStart = Clock::now();
+
+            auto it = std::filesystem::directory_iterator(layerPath);
+            Poly momentum;
+            std::vector<std::thread> threads;
+            size_t num_threads = std::thread::hardware_concurrency();
+            std::mutex taskMutex, resMutex;
+            for(size_t tt = 0; tt < num_threads; tt++) {
+                threads.emplace_back([&it, &momentum, &taskMutex, &resMutex]() {
+                    Poly momentumCur;
+                    while(true) {
+                        std::unique_lock<std::mutex> lock(taskMutex);
+                        if(it == std::filesystem::directory_iterator{})
+                            break;
+                        std::string filepath = it->path();
+                        it++;
+                        lock.unlock();
+                         
+                        std::vector<Expression> expressions = loadAndDeleteBlock(filepath);
+                        for(const Expression& expr : expressions)
+                            momentumCur += expr.getPoly() * expr.getPoly();
+                    }
+                    std::lock_guard<std::mutex> lock2(resMutex);
+                    momentum += momentumCur;
+                });
+            }
+            for(size_t j = 0; j < threads.size(); j++)
+                threads[j].join();
+
+            momentum.print();
+            std::cout << std::endl;
+            
+            std::cerr << "Момент коммутатора " << i << " посчитан" << std::endl;
+            double timeOnCurLayer = std::chrono::duration_cast<std::chrono::microseconds>(Clock::now() - timeLayerStart).count() / 1000000.0;
+            std::cerr << "Суммарное время на слое: " << timeOnCurLayer << " сек" << std::endl;
+            std::cerr << std::endl;
+        }
         return 0;
     }
 
