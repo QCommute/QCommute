@@ -2,6 +2,7 @@
 
 #include <vector>
 #include <cstdint>
+#include <cstddef>
 
 void serializeUInt8(std::vector<uint8_t>& res, uint8_t x);
 void serializeUInt32(std::vector<uint8_t>& res, uint32_t x);
