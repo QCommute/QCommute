@@ -309,22 +309,15 @@ main(int argc, char** argv)
         }
         std::string directoryPath(argv[2]);
 
-        for(size_t i = 0; ; i++) {
-            std::string layerPath = directoryPath + "/" + std::to_string(i);
-            if(!std::filesystem::exists(layerPath))
-                return 0;
-
-            std::cerr << "\e[32m" << "Этап " << i << "\e[0m" << std::endl;
-            auto timeLayerStart = Clock::now();
-
+        auto mapToPolyAndSum = [&](const std::string& layerPath, std::function<Poly(const Expression& expr)> f) {
             auto it = std::filesystem::directory_iterator(layerPath);
-            Poly momentum;
+            Poly res;
             std::vector<std::thread> threads;
             size_t num_threads = std::thread::hardware_concurrency();
             std::mutex taskMutex, resMutex;
             for(size_t tt = 0; tt < num_threads; tt++) {
-                threads.emplace_back([&it, &momentum, &taskMutex, &resMutex]() {
-                    Poly momentumCur;
+                threads.emplace_back([&it, &res, &taskMutex, &resMutex, &f]() {
+                    Poly resCur;
                     while(true) {
                         std::unique_lock<std::mutex> lock(taskMutex);
                         if(it == std::filesystem::directory_iterator{})
@@ -335,23 +328,43 @@ main(int argc, char** argv)
                          
                         std::vector<Expression> expressions = loadAndDeleteBlock(filepath);
                         for(const Expression& expr : expressions)
-                            momentumCur += expr.getPoly() * expr.getPoly();
+                            resCur += f(expr);
                     }
                     std::lock_guard<std::mutex> lock2(resMutex);
-                    momentum += momentumCur;
+                    res += resCur;
                 });
             }
             for(size_t j = 0; j < threads.size(); j++)
                 threads[j].join();
 
-            momentum.print();
-            std::cout << std::endl;
-            
+            return res;
+        };
+
+        std::cout << "moments = {" << std::endl;
+        for(size_t i = 1; ; i++) {
+            std::string layerPath = directoryPath + "/" + std::to_string(i);
+            if(!std::filesystem::exists(layerPath))
+                break;
+
+            std::cerr << "\e[32m" << "Этап " << i << "\e[0m" << std::endl;
+            auto timeLayerStart = Clock::now();
+
+            Poly momentum = mapToPolyAndSum(layerPath, [](const Expression& expr) {
+                return expr.getPoly() * expr.getPoly();
+            });
+            if(i > 1)
+                std::cout << "," << std::endl;
+            momentum.printAsMathematica(0, [](size_t ind) {
+                return "h_" + std::to_string(ind);
+            });
             std::cerr << "Момент коммутатора " << i << " посчитан" << std::endl;
+            
             double timeOnCurLayer = std::chrono::duration_cast<std::chrono::microseconds>(Clock::now() - timeLayerStart).count() / 1000000.0;
             std::cerr << "Суммарное время на слое: " << timeOnCurLayer << " сек" << std::endl;
             std::cerr << std::endl;
         }
+        std::cout << std::endl;
+        std::cout << "};" << std::endl;
         return 0;
     }
 

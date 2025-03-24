@@ -2,6 +2,7 @@
 
 #include <vector>
 #include <memory>
+#include <functional>
 #include "BigInt.h"
 
 // Многчолен с коэффициентами - длинными числами. Максимальная поддерживаемая степень переменной = 253.
@@ -25,6 +26,7 @@ public:
 
     bool isZero() const;
     void print() const;
+    void printAsMathematica(size_t groupByFirst, std::function<std::string(size_t)> varNameFunc) const;
     void serialize(std::vector<uint8_t>& res) const;
 
     Poly& operator+=(const Poly& other);
