@@ -1,18 +1,10 @@
 #include "Expression.h"
-#include <cmath>
-#include <fstream>
-#include <cstdio>
-#include <memory>
-#include <thread>
 #include <iostream>
-#include <mutex>
-#include <omp.h>
 #include <algorithm>
-#include <bitset>
+#include <cassert>
+#include <utility>
 #include "SerializationHelpers.h"
 
-extern std::string directoryPath;
-using namespace std;
 //Expression самый главный класс, он включает в себя список элементов класса Sigma (строки Паули) и многочлен (список мономов)
 //конструктор выражения от строки
 Expression::Expression(const std::string& s)
@@ -36,7 +28,7 @@ Expression::Expression(const std::string& s)
             i = end + 1;
         } else if (s[i] == 'S') {
             size_t tmp;
-            int j=1;
+            size_t j = 1;
             while (s[i+j] != ')'){
                 j++;
             }
@@ -123,7 +115,7 @@ void Expression::setSigmas1D(const Sigma<1>* sigmas, size_t sigmasSize) {
             return ptr1.getC() < ptr2.getC();
         return ptr1.getPoint() < ptr2.getPoint();
     });
-    for (int i = 0; i < (int)tmp.size(); i++) {
+    for (size_t i = 0; i < tmp.size(); i++) {
         sigmaCoords.push_back(tmp[i].getPoint().p[0]);
         if(tmp[i].getC() == 1)
             numSigmaX++;
@@ -143,7 +135,7 @@ void Expression::setSigmas2D(const Sigma<2>* sigmas, size_t sigmasSize) {
             return ptr1.getC() < ptr2.getC();
         return ptr1.getPoint() < ptr2.getPoint();
     });
-    for (int i = 0; i < (int)tmp.size(); i++) {
+    for (size_t i = 0; i < tmp.size(); i++) {
         sigmaCoords.push_back(tmp[i].getPoint().p[0]);
         sigmaCoords.push_back(tmp[i].getPoint().p[1]);
         if(tmp[i].getC() == 1)
@@ -164,7 +156,7 @@ void Expression::setSigmas3D(const Sigma<3>* sigmas, size_t sigmasSize) {
             return ptr1.getC() < ptr2.getC();
         return ptr1.getPoint() < ptr2.getPoint();
     });
-    for (int i = 0; i < (int)tmp.size(); i++) {
+    for (size_t i = 0; i < tmp.size(); i++) {
         sigmaCoords.push_back(tmp[i].getPoint().p[0]);
         sigmaCoords.push_back(tmp[i].getPoint().p[1]);
         sigmaCoords.push_back(tmp[i].getPoint().p[2]);
@@ -237,8 +229,8 @@ void commuteImpl(const Expression& O1, const Expression& O2,std::function<void(E
         return s1.getPoint() < s2.getPoint();
     });
     Sigma<D>* lst3 = new Sigma<D>[lst.size() + lst1.size()];
-    for (int i = 0; i < (int)lst.size(); i++) {
-        for (int j = 0; j < (int)lst1.size(); j++) {
+    for (size_t i = 0; i < lst.size(); i++) {
+        for (size_t j = 0; j < lst1.size(); j++) {
             auto s1 = lst[i];
             auto s11 = lst1[j];
 

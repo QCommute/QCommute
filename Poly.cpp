@@ -246,7 +246,7 @@ Poly& Poly::operator+=(const Poly& other) {
 Poly Poly::operator*(const Poly& other) const {
     Poly res;
     size_t monomStart = 0;
-    for(int32_t i = 0; i < coefs_.size(); i++) {
+    for(size_t i = 0; i < coefs_.size(); i++) {
         Poly tmp;
         tmp.coefs_ = other.coefs_;
         for(size_t j = 0; j < tmp.coefs_.size(); j++)

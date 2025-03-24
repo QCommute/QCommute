@@ -3,6 +3,7 @@
 #include <gmpxx.h>
 #include <vector>
 #include <cstdint>
+#include <string>
 
 class BigInt {
 private:

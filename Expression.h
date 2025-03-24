@@ -2,13 +2,8 @@
 
 #include <vector>
 #include <string>
-#include <iostream>
-#include <cassert>
-#include <typeinfo>
-#include <typeindex>
-#include <cmath>
 #include <cstdio>
-#include <memory>
+#include <cstdint>
 #include <functional>
 #include "Sigma.h"
 #include "Poly.h"

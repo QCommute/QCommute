@@ -1,7 +1,7 @@
 #pragma once
 
 #include <vector>
-#include <memory>
+#include <string>
 #include <functional>
 #include "BigInt.h"
 

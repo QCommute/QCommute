@@ -1,4 +1,3 @@
-//#include <bits/fs_dir.h>
 #include <cstdint>
 #include <vector>
 #include <chrono>
@@ -7,13 +6,13 @@
 #include <string>
 #include <iostream>
 #include <cassert>
-#include <ctime>
 #include <cstdio>
 #include "Expression.h"
 #include <thread>
 #include <mutex>
 #include <filesystem>
 #include <unordered_set>
+#include <cmath>
 #include <sys/wait.h>
 
 struct Node {
