@@ -64,6 +64,7 @@ void storeBlock(const std::string& path, const std::vector<Expression>& exprs) {
 struct Config {
     std::string directoryPath;
     size_t memoryLimitInBytes;
+    bool overwriteMainDirectory;
 };
 Config config;
 
@@ -370,11 +371,18 @@ main(int argc, char** argv)
     // Разбираем агрументы командной строки
     config.directoryPath = "./tmp"; //место где хранится файлы с коммутаторами 
     config.memoryLimitInBytes = std::numeric_limits<size_t>::max();
+    config.overwriteMainDirectory = false;
 
     for(int i = 2; i < argc;) {
         if(std::string(argv[i]) == "--memory-limit") {
             config.memoryLimitInBytes = std::stoull(argv[i + 1]) * 1'048'576;
             i += 2;
+        } else if(std::string(argv[i]) == "--res-dir") {
+            config.directoryPath = std::string(argv[i + 1]);
+            i += 2;
+        } else if(std::string(argv[i]) == "--force") {
+            config.overwriteMainDirectory = true;
+            i++;
         } else {
             std::cerr << "Неизвестный аргумент командной строки: \"" << argv[i] << "\"" << std::endl;
             return 1;
@@ -417,7 +425,27 @@ main(int argc, char** argv)
     int n = std::stoi(str);
     
     file.close();
-    std::cerr << "Файл считан корректно"<< std::endl;
+    std::cerr << "Файл считан корректно" << std::endl;
+
+    // Готовим директорию с коммутаторами
+    if(!std::filesystem::exists(config.directoryPath))
+        std::filesystem::create_directory(config.directoryPath);
+    if(!std::filesystem::is_empty(config.directoryPath)) {
+        if(!config.overwriteMainDirectory) {
+            std::cerr << "Ошибка: директория " + config.directoryPath + " непуста" << std::endl;
+            std::cerr << "Добавьте опцию --force, чтобы перезаписать ее содержимое, или укажите пустую директорию" << std::endl;
+            return 1;
+        } else {
+            std::cerr << "Указана опция --force, непустая директория " + config.directoryPath + " очищается..." << std::endl;
+
+            std::vector<std::filesystem::path> toDelete;
+            for(auto it = std::filesystem::directory_iterator(config.directoryPath); it != std::filesystem::directory_iterator{}; it++)
+                toDelete.push_back(*it);
+            for(const std::filesystem::path& path : toDelete)
+                std::filesystem::remove_all(path);
+        }
+    }
+    std::cerr << std::endl;
 
     // Сохраняем нулевой слой (O из входного файла) на диск
     if(!std::filesystem::exists(config.directoryPath + "/0"))
