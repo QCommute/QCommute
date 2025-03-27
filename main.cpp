@@ -14,6 +14,7 @@
 #include <unordered_set>
 #include <cmath>
 #include <sys/wait.h>
+#include <sys/stat.h>
 
 struct Node {
     Expression expr;
@@ -38,9 +39,27 @@ std::vector<uint8_t> loadFile(const std::string& path) {
     return data;
 }
 
-void storeFile(const std::string& path, const std::vector<uint8_t>& data) {
+size_t getLogicalFileSize(const std::string& path) {
+    struct stat stats;
+    stat(path.c_str(), &stats);
+    
+    return stats.st_size;
+}
+
+size_t getRealFileSize(const std::string& path) {
+    struct stat stats;
+    stat(path.c_str(), &stats);
+    
+    return stats.st_blocks * 512;
+}
+
+std::pair<size_t, size_t> storeFile(const std::string& path, const std::vector<uint8_t>& data) {
     std::ofstream stream(path, std::ios::binary);
     stream.write((char*)(data.data()), data.size());
+    stream.close();
+
+    size_t realFileSize = getRealFileSize(path);
+    return {data.size(), realFileSize};
 }
 
 std::vector<Expression> loadAndDeleteBlock(const std::string& path) {
@@ -54,11 +73,11 @@ std::vector<Expression> loadAndDeleteBlock(const std::string& path) {
     return res;
 }
 
-void storeBlock(const std::string& path, const std::vector<Expression>& exprs) {
+std::pair<size_t, size_t> storeBlock(const std::string& path, const std::vector<Expression>& exprs) {
     std::vector<uint8_t> data;
     for(size_t i = 0; i < exprs.size(); i++)
         exprs[i].serialize(data);
-    storeFile(path, data);
+    return storeFile(path, data);
 }
 
 struct Config {
@@ -72,7 +91,12 @@ std::string getPathToHashTableFile(size_t level, size_t start) {
     return config.directoryPath + "/" + std::to_string(level) + "/" + std::to_string(start) + ".comm";
 }
 
-size_t moveHashTableBlockToDisk(size_t level, size_t start, size_t tableSize, Node** indices, size_t tableOffset) {
+struct DiskMovementResult {
+    size_t numCommutators;
+    size_t writtenDiskSize;
+    size_t realDiskSize;
+};
+DiskMovementResult moveHashTableBlockToDisk(size_t level, size_t start, size_t tableSize, Node** indices, size_t tableOffset) {
     std::vector<Expression> exprs;
     for(size_t i = start; i < std::min(start + BLOCK_SIZE, tableSize); i++) {
         Node* cur_node = indices[i - tableOffset];
@@ -85,19 +109,19 @@ size_t moveHashTableBlockToDisk(size_t level, size_t start, size_t tableSize, No
         }
         indices[i - tableOffset] = nullptr;
     }
-    storeBlock(getPathToHashTableFile(level, start), exprs);
-    return exprs.size();
+    auto [writtenDiskSize, realDiskSize] = storeBlock(getPathToHashTableFile(level, start), exprs);
+    return {exprs.size(), writtenDiskSize, realDiskSize};
 }
 
-size_t moveHashTableToDisk(size_t level, Node** indices, size_t minHash, size_t maxHash) {
-    size_t O_size = 0;
+DiskMovementResult moveHashTableToDisk(size_t level, Node** indices, size_t minHash, size_t maxHash) {
+    DiskMovementResult res = {0, 0, 0};
     size_t nextHash = minHash;
     std::mutex taskMutex, resMutex;
     
     std::vector<std::thread> threads;
     size_t num_threads = std::thread::hardware_concurrency();
     for(size_t tt = 0; tt < num_threads; tt++) {
-        threads.emplace_back([&nextHash, &O_size, &taskMutex, &resMutex, indices, level, minHash, maxHash]() {
+        threads.emplace_back([&nextHash, &res, &taskMutex, &resMutex, indices, level, minHash, maxHash]() {
             while(true) {
                 std::unique_lock<std::mutex> lock(taskMutex);
                 if(nextHash >= maxHash)
@@ -106,17 +130,19 @@ size_t moveHashTableToDisk(size_t level, Node** indices, size_t minHash, size_t 
                 nextHash += BLOCK_SIZE;
                 lock.unlock();
 
-                size_t added = moveHashTableBlockToDisk(level, curHash, maxHash, indices, minHash);
+                auto [added, writtenDiskSize, realDiskSize] = moveHashTableBlockToDisk(level, curHash, maxHash, indices, minHash);
 
                 std::lock_guard<std::mutex> lock2(resMutex);
-                O_size += added;
+                res.numCommutators += added;
+                res.writtenDiskSize += writtenDiskSize;
+                res.realDiskSize += realDiskSize;
             }
         });
     }
     for(size_t j = 0; j < threads.size(); j++)
         threads[j].join();
     
-    return O_size;
+    return res;
 }
 
 size_t getMemoryUsage() {
@@ -141,6 +167,8 @@ using Clock = std::chrono::high_resolution_clock;
 
 struct ComputationResult {
     size_t O_size;
+    size_t writtenDiskSize;
+    size_t realDiskSize;
     size_t maxMemoryUsed;
 };
 
@@ -217,13 +245,13 @@ ComputationResult computePartOfNextLayerImpl(const std::vector<Expression>& H, s
               << std::chrono::duration_cast<std::chrono::microseconds>(timeLayerEnd - timeLayerStart).count() / 1000000.0 << " сек" << "\e[0m" << std::endl;
     
     // Сохраняем новый слой на диск и удаляем его из памяти
-    size_t O_size = moveHashTableToDisk(curLevelNum, indices, minHash, maxHash);
+    auto [O_size, writtenDiskSize, realDiskSize] = moveHashTableToDisk(curLevelNum, indices, minHash, maxHash);
     delete[] indices;
 
     auto timeMoveEnd = Clock::now();
     std::cerr << "\e[90m" << "Сохранение на диск: "
               << std::chrono::duration_cast<std::chrono::microseconds>(timeMoveEnd - timeLayerEnd).count() / 1000000.0 << " сек" << "\e[0m" << std::endl;
-    return {O_size, (memoryUsageEnd >= memoryUsageStart) ? (memoryUsageEnd - memoryUsageStart) : 0};
+    return {O_size, writtenDiskSize, realDiskSize, (memoryUsageEnd >= memoryUsageStart) ? (memoryUsageEnd - memoryUsageStart) : 0};
 }
 
 ComputationResult computePartOfNextLayer(const std::vector<Expression>& H, size_t prevTableSize,
@@ -389,7 +417,6 @@ main(int argc, char** argv)
         }
     }
     
-    auto timeStart = Clock::now();//просто часы чтобы мерить время исполнения
     setlocale(LC_ALL, "");
     
     std::vector<Expression> H; //Переменная Гамильтониана
@@ -451,12 +478,17 @@ main(int argc, char** argv)
     if(!std::filesystem::exists(config.directoryPath + "/0"))
         std::filesystem::create_directory(config.directoryPath + "/0");
     size_t prevTableSize = O_start.size();
+    size_t prevWrittenDiskSize = 0;
+    size_t prevRealDiskSize = 0;
     for(size_t i = 0; i < O_start.size(); i += BLOCK_SIZE) {
         std::vector<Expression> cur(O_start.begin() + i, O_start.begin() + std::min(O_start.size(), i + BLOCK_SIZE));
         std::sort(cur.begin(), cur.end());
-        storeBlock(getPathToHashTableFile(0, i), cur);
+        auto [writtenDiskSize, realDiskSize] = storeBlock(getPathToHashTableFile(0, i), cur);
+        prevWrittenDiskSize += writtenDiskSize;
+        prevRealDiskSize += realDiskSize;
     }
 
+    auto timeStart = Clock::now();//просто часы чтобы мерить время исполнения
     double prevExpansionRatio = H.size();
     double averageBytesPerHash = sizeof(Node) + sizeof(Node*);
     double timeOnPrevLayer = 0;
@@ -471,6 +503,8 @@ main(int argc, char** argv)
         size_t tableSize = std::max((size_t)1, (size_t)std::ceil(prevExpansionRatio * O_size));
 
         size_t cur_O_size = 0;
+        size_t curWrittenDiskSize = 0;
+        size_t curRealDiskSize = 0;
         size_t sumOfMemoryUsages = 0;
         for(size_t i = 0; i < tableSize;) {
             size_t maxNumHashes = config.memoryLimitInBytes / averageBytesPerHash;
@@ -479,10 +513,13 @@ main(int argc, char** argv)
             ComputationResult res = computePartOfNextLayer(H, prevTableSize, t + 1, tableSize, i, i + numHashes);
 
             cur_O_size += res.O_size;
+            curWrittenDiskSize += res.writtenDiskSize;
+            curRealDiskSize += res.realDiskSize;
             sumOfMemoryUsages += res.maxMemoryUsed;
             averageBytesPerHash = std::max((double)sumOfMemoryUsages / (i + numHashes), (double)(sizeof(Node) + sizeof(Node*)));
             i += numHashes;
         }
+        curRealDiskSize += getLogicalFileSize(config.directoryPath + "/" + std::to_string(t + 1));
 
         prevExpansionRatio = (double)cur_O_size / O_size;
         O_size = cur_O_size;
@@ -490,11 +527,15 @@ main(int argc, char** argv)
 
         auto timeLayerFinish = Clock::now();
         std::cerr << "Слой " << t + 1 << " посчитан; всего слагаемых: " << O_size << " (x" << prevExpansionRatio << " с предыдущего слоя)" << std::endl;
+        std::cerr << "Записано на диск: ~" << curWrittenDiskSize / 1'000'000 << " мегабайт (x" << (double)curWrittenDiskSize / prevWrittenDiskSize << " с предыдущего слоя)" << std::endl;
+        std::cerr << "Реально занято на диске: ~" << curRealDiskSize / 1'000'000 << " мегабайт (x" << (double)curRealDiskSize / prevRealDiskSize << " с предыдущего слоя)" << std::endl;
         double timeOnCurLayer = std::chrono::duration_cast<std::chrono::microseconds>(timeLayerFinish - timeLayerStart).count() / 1000000.0;
         std::cerr << "Суммарное время на слое: " << timeOnCurLayer << " сек";
         if(t > 0)
             std::cerr << " (x" << timeOnCurLayer / timeOnPrevLayer << " с предыдущего слоя)" << std::endl;
         timeOnPrevLayer = timeOnCurLayer;
+        prevWrittenDiskSize = curWrittenDiskSize;
+        prevRealDiskSize = curRealDiskSize;
         std::cerr << std::endl;
     }
 
