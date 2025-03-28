@@ -19,6 +19,8 @@ private:
 
     static constexpr uint8_t MONOM_END = 254;
     static constexpr uint8_t POLY_END = 255;
+
+    Poly(std::vector<uint8_t>&& powers_, const std::vector<BigInt>& coefs);
 public:
     Poly();
     Poly(const std::string& str);
@@ -28,6 +30,8 @@ public:
     void print() const;
     void printAsMathematica(size_t groupByFirst, std::function<std::string(size_t)> varNameFunc) const;
     void serialize(std::vector<uint8_t>& res) const;
+
+    Poly prependVariables(size_t numVariables) const;
 
     Poly& operator+=(const Poly& other);
     Poly operator*(const Poly& other) const;

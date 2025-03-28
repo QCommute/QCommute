@@ -212,6 +212,14 @@ const Poly& Expression::getPoly() const {
     return poly;
 }
 
+std::tuple<size_t, size_t, size_t> Expression::getNumSigmas() const {
+    if(dim == 0) {
+        assert(sigmaCoords.empty());
+        return {0, 0, 0};
+    }
+    return {numSigmaX, numSigmaY, sigmaCoords.size() / dim - numSigmaX - numSigmaY};
+}
+
 template<size_t D>
 void commuteImpl(const Expression& O1, const Expression& O2,std::function<void(Expression&& newExpression)> callback) {
     //работа с полиномами, а именно их умножение

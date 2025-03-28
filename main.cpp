@@ -330,7 +330,7 @@ main(int argc, char** argv)
         }
         std::cout << "Файлы совпадают" << std::endl;
         return 0;
-    } else if(std::string(argv[1]) == "momentum") {
+    } else if(std::string(argv[1]) == "momentum" || std::string(argv[1]) == "quench") {
         if(argc <= 2) {
             std::cout << "Необходимо указать путь к посчитанным коммутаторам" << std::endl;
             return 1;
@@ -368,7 +368,7 @@ main(int argc, char** argv)
             return res;
         };
 
-        std::cout << "moments = {" << std::endl;
+        std::cout << ((std::string(argv[1]) == "momentum") ? "moments = {" : "quenchCoef = {") << std::endl;
         for(size_t i = 1; ; i++) {
             std::string layerPath = directoryPath + "/" + std::to_string(i);
             if(!std::filesystem::exists(layerPath))
@@ -377,15 +377,31 @@ main(int argc, char** argv)
             std::cerr << "\e[32m" << "Этап " << i << "\e[0m" << std::endl;
             auto timeLayerStart = Clock::now();
 
-            Poly momentum = mapToPolyAndSum(layerPath, [](const Expression& expr) {
-                return expr.getPoly() * expr.getPoly();
-            });
-            if(i > 1)
-                std::cout << "," << std::endl;
-            momentum.printAsMathematica(0, [](size_t ind) {
-                return "h_" + std::to_string(ind);
-            });
-            std::cerr << "Момент коммутатора " << i << " посчитан" << std::endl;
+            if(std::string(argv[1]) == "momentum") {
+                Poly momentum = mapToPolyAndSum(layerPath, [](const Expression& expr) {
+                    return expr.getPoly() * expr.getPoly();
+                });
+                if(i > 1)
+                    std::cout << "," << std::endl;
+                momentum.printAsMathematica(0, [](size_t ind) {
+                    return "h_" + std::to_string(ind);
+                });
+                std::cerr << "Момент коммутатора " << i << " посчитан" << std::endl;
+            } else {
+                Poly coef = mapToPolyAndSum(layerPath, [](const Expression& expr) {
+                    auto [numSigmaX, numSigmaY, numSigmaZ] = expr.getNumSigmas();
+                    Poly multiplyBy = Poly("[1," + std::to_string(numSigmaX) + "," + std::to_string(numSigmaY) + "," + std::to_string(numSigmaZ) + "]");
+                    return expr.getPoly().prependVariables(3) * multiplyBy;
+                });
+                if(i > 1)
+                    std::cout << "," << std::endl;
+                coef.printAsMathematica(3, [](size_t ind) {
+                    if(ind < 3)
+                        return "p" + std::string(1, 'x' + ind);
+                    return "h_" + std::to_string(ind - 3);
+                });
+                std::cerr << "Коэффициент квенча коммутатора " << i << " посчитан" << std::endl;
+            }
             
             double timeOnCurLayer = std::chrono::duration_cast<std::chrono::microseconds>(Clock::now() - timeLayerStart).count() / 1000000.0;
             std::cerr << "Суммарное время на слое: " << timeOnCurLayer << " сек" << std::endl;

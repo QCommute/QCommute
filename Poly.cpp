@@ -8,6 +8,9 @@ Poly::Poly() {
     powers_ = {POLY_END};
 }
 
+Poly::Poly(std::vector<uint8_t>&& powers, const std::vector<BigInt>& coefs) : powers_(powers), coefs_(coefs) {
+}
+
 Poly::Poly(const std::string& str) {
     assert(str[0] == '[');
     assert(str.back() == ']');
@@ -159,6 +162,17 @@ void Poly::serialize(std::vector<uint8_t>& res) const {
         serializeUInt8(res, powers_[i]);
     for(size_t i = 0; i < coefs_.size(); i++)
         coefs_[i].serialize(res);
+}
+
+Poly Poly::prependVariables(size_t numVariables) const {
+    std::vector<uint8_t> powersRes;
+    for(size_t i = 0; i < powers_.size(); i++) {
+        if(powers_[i] != POLY_END && (i == 0 || powers_[i - 1] == MONOM_END))
+            for(size_t j = 0; j < numVariables; j++)
+                powersRes.push_back(0);
+        powersRes.push_back(powers_[i]);
+    }
+    return {std::move(powersRes), coefs_};
 }
 
 Poly& Poly::operator+=(const Poly& other) {

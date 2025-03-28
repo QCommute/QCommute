@@ -50,6 +50,7 @@ public:
     bool operator<(const Expression &ex1) const;
     Poly& getPoly();
     const Poly& getPoly() const;
+    std::tuple<size_t, size_t, size_t> getNumSigmas() const;
     
     void print() const;
     void serialize(std::vector<uint8_t>& res) const;
