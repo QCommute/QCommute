@@ -129,7 +129,7 @@ void Poly::printAsMathematica(size_t groupByFirst, std::function<std::string(siz
                     std::cout << '^' << (+firstPowers[i]);
             }
 
-        bool needParentheses = !firstOuterVar && monoms.size() > 1;
+        bool needParentheses = !firstOuterVar;
         if(needParentheses)
             std::cout << " (";
         else if(!firstOuterVar)
