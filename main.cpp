@@ -384,7 +384,7 @@ main(int argc, char** argv)
                 if(i > 1)
                     std::cout << "," << std::endl;
                 momentum.printAsMathematica(0, [](size_t ind) {
-                    return "h_" + std::to_string(ind);
+                    return "h" + std::to_string(ind);
                 });
                 std::cerr << "Момент коммутатора " << i << " посчитан" << std::endl;
             } else {
@@ -398,7 +398,7 @@ main(int argc, char** argv)
                 coef.printAsMathematica(3, [](size_t ind) {
                     if(ind < 3)
                         return "p" + std::string(1, 'x' + ind);
-                    return "h_" + std::to_string(ind - 3);
+                    return "h" + std::to_string(ind - 3);
                 });
                 std::cerr << "Коэффициент квенча коммутатора " << i << " посчитан" << std::endl;
             }
