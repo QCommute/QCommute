@@ -84,6 +84,7 @@ struct Config {
     std::string directoryPath;
     size_t memoryLimitInBytes;
     bool overwriteMainDirectory;
+    bool textOutput;
 };
 Config config;
 
@@ -416,6 +417,7 @@ main(int argc, char** argv)
     config.directoryPath = "./tmp"; //место где хранится файлы с коммутаторами 
     config.memoryLimitInBytes = std::numeric_limits<size_t>::max();
     config.overwriteMainDirectory = false;
+    config.textOutput = false;
 
     for(int i = 2; i < argc;) {
         if(std::string(argv[i]) == "--memory-limit") {
@@ -426,6 +428,9 @@ main(int argc, char** argv)
             i += 2;
         } else if(std::string(argv[i]) == "--force") {
             config.overwriteMainDirectory = true;
+            i++;
+        } else if(std::string(argv[i]) == "--text-output") {
+            config.textOutput = true;
             i++;
         } else {
             std::cerr << "Неизвестный аргумент командной строки: \"" << argv[i] << "\"" << std::endl;
@@ -558,12 +563,14 @@ main(int argc, char** argv)
     auto timeEnd = Clock::now();
     std::cerr << "Вычисление заняло " << std::chrono::duration_cast<std::chrono::microseconds>(timeEnd - timeStart).count() / 1000000.0 << " сек" << std::endl;
     
-    //вывод результата, пока он делается просто на экран
-    for(size_t i = 0; i < prevTableSize; i += BLOCK_SIZE)
-        for(const auto& expr : loadAndDeleteBlock(getPathToHashTableFile(n, i)))
-            expr.print();
+    if(config.textOutput) {
+        for(size_t i = 0; i < prevTableSize; i += BLOCK_SIZE)
+            for(const auto& expr : loadAndDeleteBlock(getPathToHashTableFile(n, i)))
+                expr.print();
+        
+        auto timeFinish = Clock::now();
+        std::cerr << "Вывод занял " << std::chrono::duration_cast<std::chrono::microseconds>(timeFinish - timeEnd).count() / 1000000.0 << " сек" << std::endl;
+    }
 
-    auto timeFinish = Clock::now();
-    std::cerr << "Вывод занял " << std::chrono::duration_cast<std::chrono::microseconds>(timeFinish - timeEnd).count() / 1000000.0 << " сек" << std::endl;
     return 0;
 }
