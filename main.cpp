@@ -523,12 +523,19 @@ main(int argc, char** argv)
         auto timeLayerStart = Clock::now();
         size_t tableSize = std::max((size_t)1, (size_t)std::ceil(prevExpansionRatio * O_size));
 
+        auto safeSubtract = [](size_t x, size_t y) {
+            return (x >= y) ? (x - y) : 0;
+        };
+        static_assert(sizeof(Node) >= sizeof(Expression));
+        size_t memoryUsagePerOldExpression = safeSubtract(averageBytesPerHash, (sizeof(Node) - sizeof(Expression)) + sizeof(std::mutex) / 16);
+        size_t fixedMemoryUsage = std::thread::hardware_concurrency() * (BLOCK_SIZE * memoryUsagePerOldExpression + 131'072);
+        
         size_t cur_O_size = 0;
         size_t curWrittenDiskSize = 0;
         size_t curRealDiskSize = 0;
         size_t sumOfMemoryUsages = 0;
         for(size_t i = 0; i < tableSize;) {
-            size_t maxNumHashes = config.memoryLimitInBytes / averageBytesPerHash;
+            size_t maxNumHashes = safeSubtract(config.memoryLimitInBytes, fixedMemoryUsage) / averageBytesPerHash;
             size_t numHashes = std::min(tableSize - i, std::max((size_t)BLOCK_SIZE, maxNumHashes - maxNumHashes % BLOCK_SIZE));
 
             ComputationResult res = computePartOfNextLayer(H, prevTableSize, t + 1, tableSize, i, i + numHashes);
