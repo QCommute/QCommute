@@ -25,7 +25,7 @@ struct Node {
     }
 };
 
-#define BLOCK_SIZE 512
+#define BLOCK_SIZE 2048
 
 std::vector<uint8_t> loadFile(const std::string& path) {
     std::ifstream stream(path, std::ios::binary);
