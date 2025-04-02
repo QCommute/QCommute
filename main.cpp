@@ -15,6 +15,7 @@
 #include <cmath>
 #include <sys/wait.h>
 #include <sys/stat.h>
+#include "Poly2.h"
 
 struct Node {
     Expression expr;
@@ -340,13 +341,13 @@ main(int argc, char** argv)
 
         auto mapToPolyAndSum = [&](const std::string& layerPath, std::function<Poly(const Expression& expr)> f) {
             auto it = std::filesystem::directory_iterator(layerPath);
-            Poly res;
+            Poly2 res;
             std::vector<std::thread> threads;
             size_t num_threads = std::thread::hardware_concurrency();
             std::mutex taskMutex, resMutex;
             for(size_t tt = 0; tt < num_threads; tt++) {
                 threads.emplace_back([&it, &res, &taskMutex, &resMutex, &f]() {
-                    Poly resCur;
+                    Poly2 resCur;
                     while(true) {
                         std::unique_lock<std::mutex> lock(taskMutex);
                         if(it == std::filesystem::directory_iterator{})
@@ -357,7 +358,7 @@ main(int argc, char** argv)
                          
                         std::vector<Expression> expressions = loadAndDeleteBlock(filepath);
                         for(const Expression& expr : expressions)
-                            resCur += f(expr);
+                            resCur += Poly2(f(expr));
                     }
                     std::lock_guard<std::mutex> lock2(resMutex);
                     res += resCur;
@@ -379,7 +380,7 @@ main(int argc, char** argv)
             auto timeLayerStart = Clock::now();
 
             if(std::string(argv[1]) == "momentum") {
-                Poly momentum = mapToPolyAndSum(layerPath, [](const Expression& expr) {
+                Poly2 momentum = mapToPolyAndSum(layerPath, [](const Expression& expr) {
                     return expr.getPoly() * expr.getPoly();
                 });
                 if(i > 1)
@@ -389,7 +390,7 @@ main(int argc, char** argv)
                 });
                 std::cerr << "Момент коммутатора " << i << " посчитан" << std::endl;
             } else {
-                Poly coef = mapToPolyAndSum(layerPath, [](const Expression& expr) {
+                Poly2 coef = mapToPolyAndSum(layerPath, [](const Expression& expr) {
                     auto [numSigmaX, numSigmaY, numSigmaZ] = expr.getNumSigmas();
                     Poly multiplyBy = Poly("[1," + std::to_string(numSigmaX) + "," + std::to_string(numSigmaY) + "," + std::to_string(numSigmaZ) + "]");
                     return expr.getPoly().prependVariables(3) * multiplyBy;

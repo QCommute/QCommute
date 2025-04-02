@@ -8,6 +8,7 @@
 // Многчолен с коэффициентами - длинными числами. Максимальная поддерживаемая степень переменной = 253.
 // Число перменных не ограничено.
 class Poly {
+    friend class Poly2;
 private:
     // инварианты:
     // * слагаемые идут в лексикографическом порядке векторов степеней;
@@ -28,7 +29,6 @@ public:
 
     bool isZero() const;
     void print() const;
-    void printAsMathematica(size_t groupByFirst, std::function<std::string(size_t)> varNameFunc) const;
     void serialize(std::vector<uint8_t>& res) const;
 
     Poly prependVariables(size_t numVariables) const;

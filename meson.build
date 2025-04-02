@@ -17,6 +17,7 @@ src_files = [
     'BigInt.cpp',
     'Expression.cpp',
     'Poly.cpp',
+    'Poly2.cpp',
 ]
 executable('main', src_files, dependencies : dependencies)
 
