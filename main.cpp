@@ -291,10 +291,106 @@ ComputationResult computePartOfNextLayer(const std::vector<Expression>& H, size_
     }
 }
 
+std::string help_usage1 = "validate [FILE1] [FILE2]";
+std::string help_usage2 = "momentum [DIRECTORY]";
+std::string help_usage3 = "quench [DIRECTORY]";
+std::string help_usage4 = "--help";
+std::string help_usage5 = "--version";
+std::string help_usage6 = "[FILE] [OPTION]...";
+std::string help =
+    "Perform actions on sums of Pauli strings.\n"
+    "\n"
+    "validate:\n"
+    "    This sub-command accepts two files, both of which should contain Pauli\n"
+    "    strings, one per line. The files should be in human-readable format.\n"
+    "    The sums of strings from these files are compared; it is reported whether\n"
+    "    or not the sums match.\n"
+    "    Sometimes the exact mismatch reason will also be reported.\n"
+    "\n"
+    "momentum:\n"
+    "    This sub-command accepts a path to a directory with Pauli string sums\n"
+    "    The directory structure should follow the pattern below:\n"
+    "\n"
+    "        top_path\n"
+    "        |  0\n"
+    "        |  |  0.comm\n"
+    "        |  |  512.comm\n"
+    "        |  |  ...\n"
+    "        |  1\n"
+    "        |  |  0.comm\n"
+    "        |  |  512.comm\n"
+    "        |  |  ...\n"
+    "\n"
+    "    For each sub-directory (0 and 1 in the example above), the momentum\n"
+    "    of the sum of all strings saved in that sub-directory will be\n"
+    "    computed. Momentum is the sum of squares of all polynomials.\n"
+    "\n"
+    "quench:\n"
+    "    This sub-command works exactly like \"momenum\", but computes quench\n"
+    "    coefficients rather than momentums. To compute the quench coefficient,\n"
+    "    for each Pauli string, the number of x, y, and z sigmas is computed,\n"
+    "    and for each unique triple (nx, ny, nz) of counts, the sum of\n"
+    "    polynomials of all Pauli strings with these counts is computed. The\n"
+    "    resulted is returned as a polynomial with three new variables px, py and\n"
+    "    pz representing sigma counts as their degrees.\n"
+    "\n"
+    "--help:\n"
+    "    Print this message and exit.\n"
+    "\n"
+    "--version:\n"
+    "    Print the version of the program and exit.\n"
+    "\n"
+    "otherwise:\n"
+    "    Compute nested commutators for the problem described in FILE. The file\n"
+    "    format is the following:\n"
+    "\n"
+    "        H:\n"
+    "        <Pauli string>\n"
+    "        ...\n"
+    "        O:\n"
+    "        <Pauli string>\n"
+    "        ...\n"
+    "        n:\n"
+    "        <number of commutators to compute>\n"
+    "\n"
+    "    See the file examples/Comm.txt for a concrete example of a file, or visit\n"
+    "    https://gitlab.com/viacheslav_hrushev/commutators/examples/Comm.txt\n"
+    "\n"
+    "    The result will be saved as a directory with a sub-directory for each\n"
+    "    computed commutator (see the explanation of \"momentum\" sub-command\n"
+    "    above).\n"
+    "\n"
+    "    Other options are listed below:\n"
+    "\n"
+    "    --memory-limit N     Sets the memory limit of N megabytes for the whole\n"
+    "                         program. The default is no memory limit.\n"
+    "    --res-dir DIRECTORY  Sets the path that the commutators will be written to\n"
+    "                         to DIRECTORY. The default is ./tmp\n"
+    "    --force              Delete the contents of the result directory before\n"
+    "                         starting the computation. If the directory is not\n"
+    "                         empty and this option is not set, an error will be\n"
+    "                         thrown.\n"
+    "    --text-output        Print the final computed commutator in human-readable\n"
+    "                         format. Warning: for large commutators, this will be\n"
+    "                         very slow.\n";
+                      
 int
 main(int argc, char** argv)
 {
-    if(std::string(argv[1]) == "validate") {
+    if(std::string(argv[1]) == "--version") {
+        std::cout << "Commutators v1.0" << std::endl;
+        return 0;
+    } else if(std::string(argv[1]) == "--help") {
+        std::cout << "Usage: " << argv[0] << " " << help_usage1 << std::endl;
+        std::cout << "   or: " << argv[0] << " " << help_usage2 << std::endl;
+        std::cout << "   or: " << argv[0] << " " << help_usage3 << std::endl;
+        std::cout << "   or: " << argv[0] << " " << help_usage4 << std::endl;
+        std::cout << "   or: " << argv[0] << " " << help_usage5 << std::endl;
+        std::cout << "   or: " << argv[0] << " " << help_usage6 << std::endl;
+        std::cout << std::endl;
+        std::cout << help;
+        return 0;
+    } else if(std::string(argv[1]) == "validate") {
         std::vector<Expression> src, new_;
         std::string str;
         
