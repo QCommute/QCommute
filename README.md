@@ -32,4 +32,4 @@ For detailed information on how to invoke the program to perform various tasks, 
 
 # License
 
-Commutators © 2025 by Ilya Shirokov, Viacheslav Khrushchev, Oleg Lychkovskiy is licensed under CC BY-ND 4.0. To view a copy of this license, visit https://creativecommons.org/licenses/by-nd/4.0/ 
+Developers: Ilya Shirokov, Viacheslav Khrushchev is licensed under CC BY-ND 4.0. To view a copy of this license, visit https://creativecommons.org/licenses/by-nd/4.0/ 
