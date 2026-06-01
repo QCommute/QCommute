@@ -5,11 +5,11 @@
 #include <utility>
 #include "SerializationHelpers.h"
 
-//Expression самый главный класс, он включает в себя список элементов класса Sigma (строки Паули) и многочлен (список мономов)
-//конструктор выражения от строки
+// Expression is the central class; it holds a list of Sigma (Pauli string) elements and a polynomial (list of monomials)
+// Constructor of an expression from a string
 Expression::Expression(const std::string& s)
 {
-    //Ну это ее при тебе писал, по первому символу вызываем нужные конструкторы, выделяем память и закидываем в список
+    // Parse the string: dispatch constructors by first character, allocate and append to list
     im = false;
     dim = 0;
     std::vector<Sigma1d> lst1;
@@ -167,7 +167,7 @@ void Expression::setSigmas3D(const Sigma<3>* sigmas, size_t sigmasSize) {
     }
 }
 
-//много вспомогательных функций
+// auxiliary helper functions
 template<>
 std::vector<Sigma<1>> Expression::getList<1>() const {
     if(dim == 0)
@@ -222,12 +222,12 @@ std::tuple<size_t, size_t, size_t> Expression::getNumSigmas() const {
 
 template<size_t D>
 void commuteImpl(const Expression& O1, const Expression& O2,std::function<void(Expression&& newExpression)> callback) {
-    //работа с полиномами, а именно их умножение
+    // polynomial arithmetic: multiply the two polynomial coefficients
     Poly pol1 = O1.poly * O2.poly;
     pol1 *= 2;
     Poly m_pol1 = pol1 * (-1);
     
-    //отсюда начинается сама коммутация в прицнипе тут осбо модно ничего не комментировать главное то как записывается результат в конце , там будет комментарий
+    // The main commutation logic starts here; the key part is how the result is recorded at the end (see comment below)
     std::vector<Sigma<D>> lst = O1.getList<D>();
     std::sort(lst.begin(), lst.end(), [&](const Sigma<D>& s1, const Sigma<D>& s2) {
         return s1.getPoint() < s2.getPoint();
@@ -259,8 +259,8 @@ void commuteImpl(const Expression& O1, const Expression& O2,std::function<void(E
                 nc=nc*(-1);
             }
 
-            // строим список сигм, отсортированный по точке
-            // сигмы, попавшие в одну точку, схлопываются
+            // build the list of sigmas sorted by lattice point;
+            // sigmas landing on the same point collapse
             Point<D> pd = s11.getPoint() - s1.getPoint();
             Point<D> deltaLst1 = -Point<D>::elementwiseMin(pd, Point<D>()), deltaLst = Point<D>::elementwiseMax(Point<D>(), pd);
             size_t lst3Size = 0;
@@ -305,7 +305,7 @@ void commuteImpl(const Expression& O1, const Expression& O2,std::function<void(E
                 continue;
             }
 
-            // ??? сдвигаем минимум в точку 1
+            // shift minimum to point 1
             if(lst3Size > 0) {
                 Point<D> mp = lst3[0].getPoint();
                 for(size_t k = 1; k < lst3Size; k++)
@@ -318,7 +318,7 @@ void commuteImpl(const Expression& O1, const Expression& O2,std::function<void(E
                     lst3[k].setPoint(lst3[k].getPoint() + delta);
             }
 
-            // ??? создаем новое выражение
+            // create the new expression
             imm = imm % 4;
             if(imm == 2 || imm == 3) {
                 Expression O1(lst3, lst3Size, m_pol1, (imm % 2) == 1);
@@ -332,7 +332,7 @@ void commuteImpl(const Expression& O1, const Expression& O2,std::function<void(E
     delete[] lst3;
 }
 
-//самый главный оператор (коммутатор списка с элементов)
+// the primary operator: commutator of two Pauli string expressions
 void Expression::Commute(const Expression& O, std::function<void(Expression&& newExpression)> callback) const {
     if(sigmaCoords.empty() || O.sigmaCoords.empty())
         return;
@@ -358,7 +358,7 @@ bool Expression::operator==(const Expression &ex1) const {
 
     if(dim != ex1.dim)
         return false;
-    // Сигмы хранятся в отсортированном порядке, поэтому достаточно сравнить вектора координат
+    // Sigmas are stored in sorted order, so comparing the coordinate vectors is sufficient
     return sigmaCoords == ex1.sigmaCoords;
 }
 
@@ -375,7 +375,7 @@ bool Expression::operator<(const Expression &ex1) const {
 
     if(dim != ex1.dim)
         return dim < ex1.dim;
-    // Сигмы хранятся в отсортированном порядке, поэтому достаточно сравнить вектора координат
+    // Sigmas are stored in sorted order, so comparing the coordinate vectors is sufficient
     return sigmaCoords < ex1.sigmaCoords;
 }
 

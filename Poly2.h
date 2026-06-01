@@ -7,12 +7,12 @@
 
 class Poly;
 
-// Многчолен с коэффициентами - длинными числами. Максимальная поддерживаемая степень переменной = 253.
-// Число перменных не ограничено.
+// Polynomial with arbitrary-precision (BigInt) coefficients. Maximum supported degree per variable = 253.
+// The number of variables is unlimited.
 class Poly2 {
 private:
-    // инварианты:
-    // * нет слагаемых с нулевым коэффициентом
+    // invariants:
+    // * no terms with a zero coefficient
     std::map<std::vector<uint8_t>, BigInt> data_;
 public:
     Poly2() = default;

@@ -208,7 +208,7 @@ ComputationResult computePartOfNextLayerImpl(const std::vector<Expression>& H, s
                 
                 for (size_t i = 0; i < H.size(); i++)
                     for(size_t j = 0; j < expressionsCur.size(); j++)
-                        H[i].Commute(expressionsCur[j], [&](Expression&& newExpression) {
+                H[i].Commute(expressionsCur[j], [&](Expression&& newExpression) {
                             size_t hash = ExpressionHasher()(newExpression);
                             if(hash  % curTableSize < minHash || hash  % curTableSize >= maxHash)
                                 return;
@@ -232,7 +232,7 @@ ComputationResult computePartOfNextLayerImpl(const std::vector<Expression>& H, s
                                 else
                                     prev_node->next = new Node(std::move(newExpression), cur_node);
                             }
-                        }); //коммутируем все салгаемые с гамильтонанном.
+                        }); // commute all terms of the expression with the Hamiltonian
             }
         });
     }
@@ -243,16 +243,16 @@ ComputationResult computePartOfNextLayerImpl(const std::vector<Expression>& H, s
         
     delete[] indexMutexes;
     auto timeLayerEnd = Clock::now();
-    std::cerr << "\e[90m" << "Подсчет слагаемых и приведение подобных: "
-              << std::chrono::duration_cast<std::chrono::microseconds>(timeLayerEnd - timeLayerStart).count() / 1000000.0 << " сек" << "\e[0m" << std::endl;
+    std::cerr << "\e[90m" << "Collecting and combining like terms: "
+              << std::chrono::duration_cast<std::chrono::microseconds>(timeLayerEnd - timeLayerStart).count() / 1000000.0 << " sec" << "\e[0m" << std::endl;
     
-    // Сохраняем новый слой на диск и удаляем его из памяти
+    // Save the new layer to disk and free it from memory
     auto [O_size, writtenDiskSize, realDiskSize] = moveHashTableToDisk(curLevelNum, indices, minHash, maxHash);
     delete[] indices;
 
     auto timeMoveEnd = Clock::now();
-    std::cerr << "\e[90m" << "Сохранение на диск: "
-              << std::chrono::duration_cast<std::chrono::microseconds>(timeMoveEnd - timeLayerEnd).count() / 1000000.0 << " сек" << "\e[0m" << std::endl;
+    std::cerr << "\e[90m" << "Saving to disk: "
+              << std::chrono::duration_cast<std::chrono::microseconds>(timeMoveEnd - timeLayerEnd).count() / 1000000.0 << " sec" << "\e[0m" << std::endl;
     return {O_size, writtenDiskSize, realDiskSize, (memoryUsageEnd >= memoryUsageStart) ? (memoryUsageEnd - memoryUsageStart) : 0};
 }
 
@@ -278,7 +278,7 @@ ComputationResult computePartOfNextLayer(const std::vector<Expression>& H, size_
         int wstatus;
         waitpid(fork_res, &wstatus, 0);
         if(!(WIFEXITED(wstatus) && WEXITSTATUS(wstatus) == 0)) {
-            std::cerr << "Не удалось корректно завершить вычисления" << std::endl;
+            std::cerr << "Failed to complete computation successfully" << std::endl;
             exit(1);
         }
 
@@ -406,31 +406,31 @@ main(int argc, char** argv)
         for(size_t i = 0; i < src.size(); i++)
             remain_src.insert(src[i]);
         if(remain_src.size() != src.size()) {
-            std::cout << "В первом файле есть подобные слагаемые, проверка не удалась" << std::endl;
+            std::cout << "The first file contains duplicate terms, validation failed" << std::endl;
             return 0;
         }
         if(src.size() != new_.size()) {
-            std::cout << "В файлах разное количество слагаемых" << std::endl;
+            std::cout << "The files have a different number of terms" << std::endl;
             return 0;
         }
 
         for(size_t i = 0; i < new_.size(); i++) {
             auto it = remain_src.find(new_[i]);
             if(it == remain_src.end()) {
-                std::cout << "Файлы не совпадают" << std::endl;
+                std::cout << "Files do not match" << std::endl;
                 return 0;
             }
             if(!(it->getPoly() == new_[i].getPoly())) {
-                std::cout << "Файлы не совпадают" << std::endl;
+                std::cout << "Files do not match" << std::endl;
                 return 0;
             }
             remain_src.erase(it);
         }
-        std::cout << "Файлы совпадают" << std::endl;
+        std::cout << "Files match" << std::endl;
         return 0;
     } else if(std::string(argv[1]) == "momentum" || std::string(argv[1]) == "quench") {
         if(argc <= 2) {
-            std::cout << "Необходимо указать путь к посчитанным коммутаторам" << std::endl;
+            std::cout << "Please specify the path to the computed commutators" << std::endl;
             return 1;
         }
         std::string directoryPath(argv[2]);
@@ -472,7 +472,7 @@ main(int argc, char** argv)
             if(!std::filesystem::exists(layerPath))
                 break;
 
-            std::cerr << "\e[32m" << "Этап " << i << "\e[0m" << std::endl;
+            std::cerr << "\e[32m" << "Step " << i << "\e[0m" << std::endl;
             auto timeLayerStart = Clock::now();
 
             if(std::string(argv[1]) == "momentum") {
@@ -484,7 +484,7 @@ main(int argc, char** argv)
                 momentum.printAsMathematica(0, [](size_t ind) {
                     return "h" + std::to_string(ind);
                 });
-                std::cerr << "Момент коммутатора " << i << " посчитан" << std::endl;
+                std::cerr << "Commutator moment " << i << " computed" << std::endl;
             } else {
                 Poly2 coef = mapToPolyAndSum(layerPath, [](const Expression& expr) {
                     auto [numSigmaX, numSigmaY, numSigmaZ] = expr.getNumSigmas();
@@ -498,11 +498,11 @@ main(int argc, char** argv)
                         return "p" + std::string(1, 'x' + ind);
                     return "h" + std::to_string(ind - 3);
                 });
-                std::cerr << "Коэффициент квенча коммутатора " << i << " посчитан" << std::endl;
+                std::cerr << "Quench coefficient of commutator " << i << " computed" << std::endl;
             }
             
             double timeOnCurLayer = std::chrono::duration_cast<std::chrono::microseconds>(Clock::now() - timeLayerStart).count() / 1000000.0;
-            std::cerr << "Суммарное время на слое: " << timeOnCurLayer << " сек" << std::endl;
+            std::cerr << "Total time on step: " << timeOnCurLayer << " sec" << std::endl;
             std::cerr << std::endl;
         }
         std::cout << std::endl;
@@ -510,8 +510,8 @@ main(int argc, char** argv)
         return 0;
     }
 
-    // Разбираем агрументы командной строки
-    config.directoryPath = "./tmp"; //место где хранится файлы с коммутаторами 
+    // Parse command-line arguments
+    config.directoryPath = "./tmp"; // directory where commutator files are stored 
     config.memoryLimitInBytes = std::numeric_limits<size_t>::max();
     config.overwriteMainDirectory = false;
     config.textOutput = false;
@@ -530,21 +530,21 @@ main(int argc, char** argv)
             config.textOutput = true;
             i++;
         } else {
-            std::cerr << "Неизвестный аргумент командной строки: \"" << argv[i] << "\"" << std::endl;
+            std::cerr << "Unknown command-line argument: \"" << argv[i] << "\"" << std::endl;
             return 1;
         }
     }
     
     setlocale(LC_ALL, "");
     
-    std::vector<Expression> H; //Переменная Гамильтониана
-    std::vector<Expression> O_start; //Переменная Наблюдаемой
+    std::vector<Expression> H; // Hamiltonian
+    std::vector<Expression> O_start; // Observable
     size_t O_size = 0;
     
-    std::ifstream file(argv[1], std::ifstream::in); //Открываем файл в котором содерижится наблюдаемая и гамильтониан
+    std::ifstream file(argv[1], std::ifstream::in); // open the file containing the observable and Hamiltonian
     std::string str;
 
-    // Гамильтониан
+    // Hamiltonian
     std::getline(file, str);
     assert(str == "H:");
 
@@ -554,7 +554,7 @@ main(int argc, char** argv)
         std::getline(file, str);
     }
 
-    // Наблюдаемая
+    // Observable
     assert(str == "O:");
 
     std::getline(file, str);
@@ -564,24 +564,24 @@ main(int argc, char** argv)
         std::getline(file, str);
     }
 
-    // Число коммутаторов
+    // Number of commutators
     assert(str == "n:");
     std::getline(file, str);
     int n = std::stoi(str);
     
     file.close();
-    std::cerr << "Файл считан корректно" << std::endl;
+    std::cerr << "File parsed successfully" << std::endl;
 
-    // Готовим директорию с коммутаторами
+    // Prepare the commutator output directory
     if(!std::filesystem::exists(config.directoryPath))
         std::filesystem::create_directory(config.directoryPath);
     if(!std::filesystem::is_empty(config.directoryPath)) {
         if(!config.overwriteMainDirectory) {
-            std::cerr << "Ошибка: директория " + config.directoryPath + " непуста" << std::endl;
-            std::cerr << "Добавьте опцию --force, чтобы перезаписать ее содержимое, или укажите пустую директорию" << std::endl;
+            std::cerr << "Error: directory " + config.directoryPath + " is not empty" << std::endl;
+            std::cerr << "Add the --force option to overwrite its contents, or specify an empty directory" << std::endl;
             return 1;
         } else {
-            std::cerr << "Указана опция --force, непустая директория " + config.directoryPath + " очищается..." << std::endl;
+            std::cerr << "--force specified, clearing non-empty directory " + config.directoryPath + "..." << std::endl;
 
             std::vector<std::filesystem::path> toDelete;
             for(auto it = std::filesystem::directory_iterator(config.directoryPath); it != std::filesystem::directory_iterator{}; it++)
@@ -592,7 +592,7 @@ main(int argc, char** argv)
     }
     std::cerr << std::endl;
 
-    // Сохраняем нулевой слой (O из входного файла) на диск
+    // Save layer 0 (the initial observable O) to disk
     if(!std::filesystem::exists(config.directoryPath + "/0"))
         std::filesystem::create_directory(config.directoryPath + "/0");
     size_t prevTableSize = O_start.size();
@@ -606,15 +606,15 @@ main(int argc, char** argv)
         prevRealDiskSize += realDiskSize;
     }
 
-    auto timeStart = Clock::now();//просто часы чтобы мерить время исполнения
+    auto timeStart = Clock::now(); // clock for measuring execution time
     double prevExpansionRatio = H.size();
     double averageBytesPerHash = sizeof(Node) + sizeof(Node*);
     double timeOnPrevLayer = 0;
     for(int32_t t = 0; t < n; t++) {
-        std::cerr << "\e[32m" << "Этап " << t + 1 << "\e[0m" << std::endl;
+        std::cerr << "\e[32m" << "Step " << t + 1 << "\e[0m" << std::endl;
         if(!std::filesystem::exists(config.directoryPath + "/" + std::to_string(t + 1))) {
             std::filesystem::create_directory(config.directoryPath + "/" + std::to_string(t + 1));
-            std::cerr << "Создана директория: " << t + 1 << std::endl;
+            std::cerr << "Created directory: " << t + 1 << std::endl;
         }
 
         auto timeLayerStart = Clock::now();
@@ -631,6 +631,7 @@ main(int argc, char** argv)
         size_t curWrittenDiskSize = 0;
         size_t curRealDiskSize = 0;
         size_t sumOfMemoryUsages = 0;
+        // commute all terms of O with the Hamiltonian
         for(size_t i = 0; i < tableSize;) {
             size_t maxNumHashes = safeSubtract(config.memoryLimitInBytes, fixedMemoryUsage) / averageBytesPerHash;
             size_t numHashes = std::min(tableSize - i, std::max((size_t)BLOCK_SIZE, maxNumHashes - maxNumHashes % BLOCK_SIZE));
@@ -651,13 +652,13 @@ main(int argc, char** argv)
         prevTableSize = tableSize;
 
         auto timeLayerFinish = Clock::now();
-        std::cerr << "Слой " << t + 1 << " посчитан; всего слагаемых: " << O_size << " (x" << prevExpansionRatio << " с предыдущего слоя)" << std::endl;
-        std::cerr << "Записано на диск: ~" << curWrittenDiskSize / 1'000'000 << " мегабайт (x" << (double)curWrittenDiskSize / prevWrittenDiskSize << " с предыдущего слоя)" << std::endl;
-        std::cerr << "Реально занято на диске: ~" << curRealDiskSize / 1'000'000 << " мегабайт (x" << (double)curRealDiskSize / prevRealDiskSize << " с предыдущего слоя)" << std::endl;
+        std::cerr << "Layer " << t + 1 << " computed; total terms: " << O_size << " (x" << prevExpansionRatio << " from previous layer)" << std::endl;
+        std::cerr << "Written to disk: ~" << curWrittenDiskSize / 1'000'000 << " MB (x" << (double)curWrittenDiskSize / prevWrittenDiskSize << " from previous layer)" << std::endl;
+        std::cerr << "Actual disk usage: ~" << curRealDiskSize / 1'000'000 << " MB (x" << (double)curRealDiskSize / prevRealDiskSize << " from previous layer)" << std::endl;
         double timeOnCurLayer = std::chrono::duration_cast<std::chrono::microseconds>(timeLayerFinish - timeLayerStart).count() / 1000000.0;
-        std::cerr << "Суммарное время на слое: " << timeOnCurLayer << " сек";
+        std::cerr << "Total time on layer: " << timeOnCurLayer << " sec";
         if(t > 0)
-            std::cerr << " (x" << timeOnCurLayer / timeOnPrevLayer << " с предыдущего слоя)" << std::endl;
+            std::cerr << " (x" << timeOnCurLayer / timeOnPrevLayer << " from previous layer)" << std::endl;
         timeOnPrevLayer = timeOnCurLayer;
         prevWrittenDiskSize = curWrittenDiskSize;
         prevRealDiskSize = curRealDiskSize;
@@ -665,7 +666,7 @@ main(int argc, char** argv)
     }
 
     auto timeEnd = Clock::now();
-    std::cerr << "Вычисление заняло " << std::chrono::duration_cast<std::chrono::microseconds>(timeEnd - timeStart).count() / 1000000.0 << " сек" << std::endl;
+    std::cerr << "Computation took " << std::chrono::duration_cast<std::chrono::microseconds>(timeEnd - timeStart).count() / 1000000.0 << " sec" << std::endl;
     
     if(config.textOutput) {
         for(size_t i = 0; i < prevTableSize; i += BLOCK_SIZE)
@@ -673,7 +674,7 @@ main(int argc, char** argv)
                 expr.print();
         
         auto timeFinish = Clock::now();
-        std::cerr << "Вывод занял " << std::chrono::duration_cast<std::chrono::microseconds>(timeFinish - timeEnd).count() / 1000000.0 << " сек" << std::endl;
+        std::cerr << "Text output took " << std::chrono::duration_cast<std::chrono::microseconds>(timeFinish - timeEnd).count() / 1000000.0 << " sec" << std::endl;
     }
 
     return 0;

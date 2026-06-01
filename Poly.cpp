@@ -223,7 +223,7 @@ Poly Poly::operator*(const Poly& other) const {
                 lenCur++;
             }
         }
-        // поскольку ко всем векторам степеней прибавился один и тот же новый вектор, сортировать заново не требуется
+        // since the same new degree vector was added to all monomials, no re-sorting is needed
 
         monomStart = monomEnd + 1;
         res += tmp;

@@ -5,15 +5,15 @@
 #include <functional>
 #include "BigInt.h"
 
-// Многчолен с коэффициентами - длинными числами. Максимальная поддерживаемая степень переменной = 253.
-// Число перменных не ограничено.
+// Polynomial with arbitrary-precision (BigInt) coefficients. Maximum supported degree per variable = 253.
+// The number of variables is unlimited.
 class Poly {
     friend class Poly2;
 private:
-    // инварианты:
-    // * слагаемые идут в лексикографическом порядке векторов степеней;
-    // * нет подобных слагаемых;
-    // * нет слагаемых с нулевым коэффициентом
+    // invariants:
+    // * terms are sorted in lexicographic order of their degree vectors;
+    // * no like terms;
+    // * no terms with a zero coefficient
     //std::vector<Monom> data_;
     std::vector<uint8_t> powers_;
     std::vector<BigInt> coefs_;
@@ -35,7 +35,7 @@ public:
 
     Poly& operator+=(const Poly& other);
     Poly operator*(const Poly& other) const;
-    // Точное равенство, включая коэффициенты
+    // Exact equality, including coefficients
     bool operator==(const Poly& other) const;
     Poly& operator*=(int n);
     Poly operator*(int n) const;

@@ -10,7 +10,7 @@
 
 int LeviChivita(int i, int j);
 
-//Класс для выражения. Возможно основной класс в программе
+// Class representing an expression. Likely the central class of the program.
 
 class Expression {
     friend struct ExpressionHasher;
@@ -18,13 +18,13 @@ class Expression {
     template<size_t D>
     friend void commuteImpl(const Expression& O1, const Expression& O2, std::function<void(Expression&& newExpression)> callback);
 private:
-    //коэффициент
+    // polynomial coefficient
     Poly poly;
-    //Список сигм
+    // list of Pauli operator coordinates
     std::vector<int> sigmaCoords;
     uint32_t numSigmaX;
     uint32_t numSigmaY;
-    int32_t dim; // 0 - размерность не определена (возникает при получении пустого списка из строки)
+    int32_t dim; // 0 means dimension is undefined (occurs when an empty list is parsed from a string)
 
     bool im;
 
@@ -36,13 +36,13 @@ private:
     std::vector<Sigma<D>> getList() const;
 public:
     Expression() = default;
-    //Конструктор от строки
+    // Constructor from a string
     Expression(const std::string& s);
-    //Конструктор от списка множителей и коэффициента, который по умолчанию 1
+    // Constructor from a list of Pauli operators and a coefficient (default 1)
     Expression(const Sigma<1>* v, size_t vSize, const Poly& r, bool imm);
     Expression(const Sigma<2>* v, size_t vSize, const Poly& r, bool imm);
     Expression(const Sigma<3>* v, size_t vSize, const Poly& r, bool imm);
-    //Конструктор для загрузки из сериализованного представления
+    // Constructor for loading from a serialized representation
     Expression(const std::vector<uint8_t>& data, size_t& ptr);
     
     void Commute(const Expression& O, std::function<void(Expression&& newExpression)> callback) const;
