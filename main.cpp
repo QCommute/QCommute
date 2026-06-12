@@ -378,20 +378,22 @@ std::string help =
 int
 main(int argc, char** argv)
 {
+    // Print a short identification banner on every invocation, as required by
+    // SciPost Codebases guidelines ("print version and licence at startup").
+    std::cerr << "Commutators v1.0  |  Copyright (c) 2025 Ilya Shirokov, Viacheslav Khrushchev" << std::endl;
+    std::cerr << "License: CC BY-ND 4.0  <https://creativecommons.org/licenses/by-nd/4.0/>" << std::endl;
+    std::cerr << std::endl;
+
     // Show help when the program is invoked with no arguments so that it does
     // not crash on the unconditional argv[1] access further below.
     if(argc <= 1) {
-        std::cout << "Usage: " << argv[0] << " " << help_usage6 << std::endl;
-        std::cout << "Run '" << argv[0] << " --help' for full usage information." << std::endl;
+        std::cerr << "Usage: " << argv[0] << " " << help_usage6 << std::endl;
+        std::cerr << "Run '" << argv[0] << " --help' for full usage information." << std::endl;
         return 1;
     }
 
     if(std::string(argv[1]) == "--version") {
-        std::cout << "Commutators v1.0" << std::endl;
-        std::cout << std::endl;
-        std::cout << "Copyright (c) 2025 Ilya Shirokov, Viacheslav Khrushchev" << std::endl;
-        std::cout << "Licensed under Creative Commons Attribution-NoDerivatives 4.0 International." << std::endl;
-        std::cout << "See https://creativecommons.org/licenses/by-nd/4.0/ for the full license text." << std::endl;
+        // Banner already printed above; just exit.
         return 0;
     } else if(std::string(argv[1]) == "--help") {
         std::cout << "Usage: " << argv[0] << " " << help_usage1 << std::endl;
