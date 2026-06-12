@@ -1,0 +1,2 @@
+option('debug_output', type : 'boolean', value : false,
+  description : 'Enable verbose [DIAG] per-window diagnostic output (adds -DDEBUG)')

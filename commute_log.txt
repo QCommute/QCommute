@@ -1,0 +1,350 @@
+File parsed successfully
+
+[32mStep 1[0m
+Created directory: 1
+[DIAG] layer=1 O_size=1 prevExpRatio=3.000000 tableSize=3 avgBytesPerHash=104.00
+[DIAG]   window=0 slots=[0, 3) maxNumHashes=4234409826
+[90mCollecting and combining like terms: 0.01 sec[0m
+[90mSaving to disk: 0.00 sec[0m
+[DIAG]   window=0 O_size_so_far=4 rawMemUsed=2 MB avgBytesPerHash=720896.00
+Layer 1 computed; total terms: 4 (x4.00 from previous layer)
+Written to disk: ~0 MB (x5.07 from previous layer)
+Actual disk usage: ~0 MB (x2.00 from previous layer)
+Total time on layer: 0.01 sec
+[32mStep 2[0m
+Created directory: 2
+[DIAG] layer=2 O_size=4 prevExpRatio=4.000000 tableSize=16 avgBytesPerHash=720896.00
+[DIAG]   window=0 slots=[0, 16) maxNumHashes=463442
+[90mCollecting and combining like terms: 0.00 sec[0m
+[90mSaving to disk: 0.00 sec[0m
+[DIAG]   window=0 O_size_so_far=11 rawMemUsed=2 MB avgBytesPerHash=134400.00
+Layer 2 computed; total terms: 11 (x2.75 from previous layer)
+Written to disk: ~0 MB (x3.04 from previous layer)
+Actual disk usage: ~0 MB (x1.00 from previous layer)
+Total time on layer: 0.01 sec (x0.85 from previous layer)
+
+[32mStep 3[0m
+Created directory: 3
+[DIAG] layer=3 O_size=11 prevExpRatio=2.750000 tableSize=31 avgBytesPerHash=134400.00
+[DIAG]   window=0 slots=[0, 31) maxNumHashes=3129284
+[90mCollecting and combining like terms: 0.00 sec[0m
+[90mSaving to disk: 0.00 sec[0m
+[DIAG]   window=0 O_size_so_far=20 rawMemUsed=2 MB avgBytesPerHash=69764.13
+Layer 3 computed; total terms: 20 (x1.82 from previous layer)
+Written to disk: ~0 MB (x2.09 from previous layer)
+Actual disk usage: ~0 MB (x1.00 from previous layer)
+Total time on layer: 0.01 sec (x1.08 from previous layer)
+
+[32mStep 4[0m
+Created directory: 4
+[DIAG] layer=4 O_size=20 prevExpRatio=1.818182 tableSize=37 avgBytesPerHash=69764.13
+[DIAG]   window=0 slots=[0, 37) maxNumHashes=6165157
+[90mCollecting and combining like terms: 0.00 sec[0m
+[90mSaving to disk: 0.00 sec[0m
+[DIAG]   window=0 O_size_so_far=52 rawMemUsed=2 MB avgBytesPerHash=58672.43
+Layer 4 computed; total terms: 52 (x2.60 from previous layer)
+Written to disk: ~0 MB (x2.89 from previous layer)
+Actual disk usage: ~0 MB (x1.00 from previous layer)
+Total time on layer: 0.01 sec (x0.98 from previous layer)
+
+[32mStep 5[0m
+Created directory: 5
+[DIAG] layer=5 O_size=52 prevExpRatio=2.600000 tableSize=136 avgBytesPerHash=58672.43
+[DIAG]   window=0 slots=[0, 136) maxNumHashes=7358522
+[90mCollecting and combining like terms: 0.00 sec[0m
+[90mSaving to disk: 0.00 sec[0m
+[DIAG]   window=0 O_size_so_far=120 rawMemUsed=2 MB avgBytesPerHash=16112.94
+Layer 5 computed; total terms: 120 (x2.31 from previous layer)
+Written to disk: ~0 MB (x2.55 from previous layer)
+Actual disk usage: ~0 MB (x1.50 from previous layer)
+Total time on layer: 0.01 sec (x0.90 from previous layer)
+
+[32mStep 6[0m
+Created directory: 6
+[DIAG] layer=6 O_size=120 prevExpRatio=2.307692 tableSize=277 avgBytesPerHash=16112.94
+[DIAG]   window=0 slots=[0, 277) maxNumHashes=27184245
+[90mCollecting and combining like terms: 0.00 sec[0m
+[90mSaving to disk: 0.00 sec[0m
+[DIAG]   window=0 O_size_so_far=332 rawMemUsed=2 MB avgBytesPerHash=8206.79
+Layer 6 computed; total terms: 332 (x2.77 from previous layer)
+Written to disk: ~0 MB (x2.95 from previous layer)
+Actual disk usage: ~0 MB (x2.33 from previous layer)
+Total time on layer: 0.01 sec (x0.99 from previous layer)
+
+[32mStep 7[0m
+Created directory: 7
+[DIAG] layer=7 O_size=332 prevExpRatio=2.766667 tableSize=919 avgBytesPerHash=8206.79
+[DIAG]   window=0 slots=[0, 919) maxNumHashes=53514723
+[90mCollecting and combining like terms: 0.01 sec[0m
+[90mSaving to disk: 0.00 sec[0m
+[DIAG]   window=0 O_size_so_far=888 rawMemUsed=2 MB avgBytesPerHash=2656.38
+Layer 7 computed; total terms: 888 (x2.67 from previous layer)
+Written to disk: ~0 MB (x2.85 from previous layer)
+Actual disk usage: ~0 MB (x2.29 from previous layer)
+Total time on layer: 0.01 sec (x1.31 from previous layer)
+
+[32mStep 8[0m
+Created directory: 8
+[DIAG] layer=8 O_size=888 prevExpRatio=2.674699 tableSize=2376 avgBytesPerHash=2656.38
+[DIAG]   window=0 slots=[0, 2376) maxNumHashes=165639634
+[90mCollecting and combining like terms: 0.02 sec[0m
+[90mSaving to disk: 0.00 sec[0m
+[DIAG]   window=0 O_size_so_far=2505 rawMemUsed=3 MB avgBytesPerHash=1294.65
+Layer 8 computed; total terms: 2505 (x2.82 from previous layer)
+Written to disk: ~0 MB (x3.01 from previous layer)
+Actual disk usage: ~0 MB (x2.81 from previous layer)
+Total time on layer: 0.02 sec (x1.92 from previous layer)
+
+[32mStep 9[0m
+Created directory: 9
+[DIAG] layer=9 O_size=2505 prevExpRatio=2.820946 tableSize=7067 avgBytesPerHash=1294.65
+[DIAG]   window=0 slots=[0, 7067) maxNumHashes=340016268
+[90mCollecting and combining like terms: 0.04 sec[0m
+[90mSaving to disk: 0.01 sec[0m
+[DIAG]   window=0 O_size_so_far=6912 rawMemUsed=4 MB avgBytesPerHash=662.48
+Layer 9 computed; total terms: 6912 (x2.76 from previous layer)
+Written to disk: ~0 MB (x2.92 from previous layer)
+Actual disk usage: ~0 MB (x2.91 from previous layer)
+Total time on layer: 0.05 sec (x2.19 from previous layer)
+
+[32mStep 10[0m
+Created directory: 10
+[DIAG] layer=10 O_size=6912 prevExpRatio=2.759281 tableSize=19073 avgBytesPerHash=662.48
+[DIAG]   window=0 slots=[0, 19073) maxNumHashes=664620893
+[90mCollecting and combining like terms: 0.05 sec[0m
+[90mSaving to disk: 0.01 sec[0m
+[DIAG]   window=0 O_size_so_far=19469 rawMemUsed=9 MB avgBytesPerHash=492.22
+Layer 10 computed; total terms: 19469 (x2.82 from previous layer)
+Written to disk: ~1 MB (x2.97 from previous layer)
+Actual disk usage: ~1 MB (x2.95 from previous layer)
+Total time on layer: 0.06 sec (x1.43 from previous layer)
+
+[32mStep 11[0m
+Created directory: 11
+[DIAG] layer=11 O_size=19469 prevExpRatio=2.816696 tableSize=54839 avgBytesPerHash=492.22
+[DIAG]   window=0 slots=[0, 54839) maxNumHashes=894569834
+[90mCollecting and combining like terms: 0.07 sec[0m
+[90mSaving to disk: 0.02 sec[0m
+[DIAG]   window=0 O_size_so_far=54480 rawMemUsed=22 MB avgBytesPerHash=413.27
+Layer 11 computed; total terms: 54480 (x2.80 from previous layer)
+Written to disk: ~4 MB (x2.96 from previous layer)
+Actual disk usage: ~4 MB (x2.95 from previous layer)
+Total time on layer: 0.09 sec (x1.38 from previous layer)
+
+[32mStep 12[0m
+Created directory: 12
+[DIAG] layer=12 O_size=54480 prevExpRatio=2.798295 tableSize=152452 avgBytesPerHash=413.27
+[DIAG]   window=0 slots=[0, 152452) maxNumHashes=1065492016
+[90mCollecting and combining like terms: 0.17 sec[0m
+[90mSaving to disk: 0.04 sec[0m
+[DIAG]   window=0 O_size_so_far=153945 rawMemUsed=62 MB avgBytesPerHash=409.16
+Layer 12 computed; total terms: 153945 (x2.83 from previous layer)
+Written to disk: ~13 MB (x2.97 from previous layer)
+Actual disk usage: ~13 MB (x2.96 from previous layer)
+Total time on layer: 0.22 sec (x2.46 from previous layer)
+
+[32mStep 13[0m
+Created directory: 13
+[DIAG] layer=13 O_size=153945 prevExpRatio=2.825716 tableSize=435005 avgBytesPerHash=409.16
+[DIAG]   window=0 slots=[0, 435005) maxNumHashes=1076176897
+[90mCollecting and combining like terms: 0.25 sec[0m
+[90mSaving to disk: 0.13 sec[0m
+[DIAG]   window=0 O_size_so_far=434860 rawMemUsed=181 MB avgBytesPerHash=417.66
+Layer 13 computed; total terms: 434860 (x2.82 from previous layer)
+Written to disk: ~40 MB (x2.97 from previous layer)
+Actual disk usage: ~41 MB (x2.96 from previous layer)
+Total time on layer: 0.43 sec (x1.96 from previous layer)
+
+[32mStep 14[0m
+Created directory: 14
+[DIAG] layer=14 O_size=434860 prevExpRatio=2.824775 tableSize=1228382 avgBytesPerHash=417.66
+[DIAG]   window=0 slots=[0, 1228382) maxNumHashes=1054272418
+[90mCollecting and combining like terms: 0.60 sec[0m
+[90mSaving to disk: 0.45 sec[0m
+[DIAG]   window=0 O_size_so_far=1236303 rawMemUsed=486 MB avgBytesPerHash=396.43
+Layer 14 computed; total terms: 1236303 (x2.84 from previous layer)
+Written to disk: ~120 MB (x2.98 from previous layer)
+Actual disk usage: ~122 MB (x2.98 from previous layer)
+Total time on layer: 1.14 sec (x2.65 from previous layer)
+
+[32mStep 15[0m
+Created directory: 15
+[DIAG] layer=15 O_size=1236303 prevExpRatio=2.842991 tableSize=3514799 avgBytesPerHash=396.43
+[DIAG]   window=0 slots=[0, 3514799) maxNumHashes=1110738774
+[90mCollecting and combining like terms: 1.70 sec[0m
+[90mSaving to disk: 1.77 sec[0m
+[DIAG]   window=0 O_size_so_far=3521636 rawMemUsed=1303 MB avgBytesPerHash=370.94
+Layer 15 computed; total terms: 3521636 (x2.85 from previous layer)
+Written to disk: ~359 MB (x2.98 from previous layer)
+Actual disk usage: ~363 MB (x2.98 from previous layer)
+Total time on layer: 3.65 sec (x3.20 from previous layer)
+
+[32mStep 16[0m
+Created directory: 16
+[DIAG] layer=16 O_size=3521636 prevExpRatio=2.848522 tableSize=10031457 avgBytesPerHash=370.94
+[DIAG]   window=0 slots=[0, 10031457) maxNumHashes=1187103878
+[90mCollecting and combining like terms: 4.96 sec[0m
+[90mSaving to disk: 18.61 sec[0m
+[DIAG]   window=0 O_size_so_far=10071179 rawMemUsed=3674 MB avgBytesPerHash=366.28
+Layer 16 computed; total terms: 10071179 (x2.86 from previous layer)
+Written to disk: ~1074 MB (x2.99 from previous layer)
+Actual disk usage: ~1084 MB (x2.99 from previous layer)
+Total time on layer: 24.04 sec (x6.58 from previous layer)
+
+[32mStep 17[0m
+Created directory: 17
+[DIAG] layer=17 O_size=10071179 prevExpRatio=2.859801 tableSize=28801571 avgBytesPerHash=366.28
+[DIAG]   window=0 slots=[0, 28801571) maxNumHashes=1202187353
+[90mCollecting and combining like terms: 14.86 sec[0m
+[90mSaving to disk: 60.16 sec[0m
+[DIAG]   window=0 O_size_so_far=28857780 rawMemUsed=10535 MB avgBytesPerHash=365.81
+Layer 17 computed; total terms: 28857780 (x2.87 from previous layer)
+Written to disk: ~3207 MB (x2.99 from previous layer)
+Actual disk usage: ~3236 MB (x2.98 from previous layer)
+Total time on layer: 75.82 sec (x3.15 from previous layer)
+
+[32mStep 18[0m
+Created directory: 18
+[DIAG] layer=18 O_size=28857780 prevExpRatio=2.865382 tableSize=82688578 avgBytesPerHash=365.81
+[DIAG]   window=0 slots=[0, 82688578) maxNumHashes=1203756334
+[90mCollecting and combining like terms: 46.67 sec[0m
+[90mSaving to disk: 129.57 sec[0m
+[DIAG]   window=0 O_size_so_far=82904085 rawMemUsed=30331 MB avgBytesPerHash=366.81
+Layer 18 computed; total terms: 82904085 (x2.87 from previous layer)
+Written to disk: ~9586 MB (x2.99 from previous layer)
+Actual disk usage: ~9670 MB (x2.99 from previous layer)
+Total time on layer: 178.16 sec (x2.35 from previous layer)
+
+[32mStep 19[0m
+Created directory: 19
+[DIAG] layer=19 O_size=82904085 prevExpRatio=2.872850 tableSize=238171035 avgBytesPerHash=366.81
+[DIAG]   window=0 slots=[0, 238171035) maxNumHashes=1200442187
+[90mCollecting and combining like terms: 148.60 sec[0m
+[90mSaving to disk: 543.63 sec[0m
+[DIAG]   window=0 O_size_so_far=238594724 rawMemUsed=87555 MB avgBytesPerHash=367.62
+Layer 19 computed; total terms: 238594724 (x2.88 from previous layer)
+Written to disk: ~28669 MB (x2.99 from previous layer)
+Actual disk usage: ~28912 MB (x2.99 from previous layer)
+Total time on layer: 699.39 sec (x3.93 from previous layer)
+
+[32mStep 20[0m
+Created directory: 20
+[DIAG] layer=20 O_size=238594724 prevExpRatio=2.877961 tableSize=686666313 avgBytesPerHash=367.62
+[DIAG]   window=0 slots=[0, 686666313) maxNumHashes=1197820706
+[90mCollecting and combining like terms: 453.22 sec[0m
+[90mSaving to disk: 1735.66 sec[0m
+[DIAG]   window=0 O_size_so_far=688036640 rawMemUsed=253196 MB avgBytesPerHash=368.73
+Layer 20 computed; total terms: 688036640 (x2.88 from previous layer)
+Written to disk: ~85753 MB (x2.99 from previous layer)
+Actual disk usage: ~86451 MB (x2.99 from previous layer)
+Total time on layer: 2211.06 sec (x3.16 from previous layer)
+
+[32mStep 21[0m
+Created directory: 21
+[DIAG] layer=21 O_size=688036640 prevExpRatio=2.883704 tableSize=1984094242 avgBytesPerHash=368.73
+[DIAG]   window=0 slots=[0, 1194196992) maxNumHashes=1194198856
+[90mCollecting and combining like terms: 913.43 sec[0m
+[90mSaving to disk: 1804.10 sec[0m
+[DIAG]   window=0 O_size_so_far=1196110610 rawMemUsed=441026 MB avgBytesPerHash=369.31
+[DIAG]   window=1 slots=[1194196992, 1984094242) maxNumHashes=1192338192
+[90mCollecting and combining like terms: 834.48 sec[0m
+[90mSaving to disk: 1155.51 sec[0m
+[DIAG]   window=1 O_size_so_far=1987346180 rawMemUsed=291779 MB avgBytesPerHash=369.34
+Layer 21 computed; total terms: 1987346180 (x2.89 from previous layer)
+Written to disk: ~256706 MB (x2.99 from previous layer)
+Actual disk usage: ~258725 MB (x2.99 from previous layer)
+Total time on layer: 4746.99 sec (x2.15 from previous layer)
+
+[32mStep 22[0m
+Created directory: 22
+[DIAG] layer=22 O_size=1987346180 prevExpRatio=2.888431 tableSize=5740311794 avgBytesPerHash=369.34
+[DIAG]   window=0 slots=[0, 1192230912) maxNumHashes=1192232797
+[90mCollecting and combining like terms: 1883.66 sec[0m
+[90mSaving to disk: 1938.35 sec[0m
+[DIAG]   window=0 O_size_so_far=1194152532 rawMemUsed=440870 MB avgBytesPerHash=369.79
+[DIAG]   window=1 slots=[1192230912, 2383024128) maxNumHashes=1190794456
+[90mCollecting and combining like terms: 1939.76 sec[0m
+[90mSaving to disk: 1962.04 sec[0m
+[DIAG]   window=1 O_size_so_far=2386959976 rawMemUsed=440374 MB avgBytesPerHash=369.80
+[DIAG]   window=2 slots=[2383024128, 3573770240) maxNumHashes=1190746647
+[90mCollecting and combining like terms: 1945.89 sec[0m
+[90mSaving to disk: 1901.95 sec[0m
+[DIAG]   window=2 O_size_so_far=3579674225 rawMemUsed=440339 MB avgBytesPerHash=369.80
+[DIAG]   window=3 slots=[3573770240, 4764516352) maxNumHashes=1190746908
+[90mCollecting and combining like terms: 1942.99 sec[0m
+[90mSaving to disk: 2011.24 sec[0m
+[DIAG]   window=3 O_size_so_far=4772374001 rawMemUsed=440337 MB avgBytesPerHash=369.80
+[DIAG]   window=4 slots=[4764516352, 5740311794) maxNumHashes=1190748201
+[90mCollecting and combining like terms: 1880.05 sec[0m
+[90mSaving to disk: 1511.23 sec[0m
+[DIAG]   window=4 O_size_so_far=5749788909 rawMemUsed=360877 MB avgBytesPerHash=369.81
+Layer 22 computed; total terms: 5749788909 (x2.89 from previous layer)
+Written to disk: ~768603 MB (x2.99 from previous layer)
+Actual disk usage: ~774442 MB (x2.99 from previous layer)
+Total time on layer: 19082.66 sec (x4.02 from previous layer)
+
+[32mStep 23[0m
+Created directory: 23
+[DIAG] layer=23 O_size=5749788909 prevExpRatio=2.893199 tableSize=16635286208 avgBytesPerHash=369.81
+[DIAG]   window=0 slots=[0, 1190731776) maxNumHashes=1190732831
+[90mCollecting and combining like terms: 4935.85 sec[0m
+[90mSaving to disk: 1911.06 sec[0m
+[DIAG]   window=0 O_size_so_far=1192445570 rawMemUsed=440970 MB avgBytesPerHash=370.34
+[DIAG]   window=1 slots=[1190731776, 2379759616) maxNumHashes=1189028974
+[90mCollecting and combining like terms: 4917.30 sec[0m
+[90mSaving to disk: 1879.58 sec[0m
+[DIAG]   window=1 O_size_so_far=2383117996 rawMemUsed=440314 MB avgBytesPerHash=370.33
+[DIAG]   window=2 slots=[2379759616, 3568820224) maxNumHashes=1189061996
+[90mCollecting and combining like terms: 4925.04 sec[0m
+[90mSaving to disk: 1883.73 sec[0m
+[DIAG]   window=2 O_size_so_far=3573877243 rawMemUsed=440349 MB avgBytesPerHash=370.33
+[DIAG]   window=3 slots=[3568820224, 4757872640) maxNumHashes=1189052866
+[90mCollecting and combining like terms: 4913.44 sec[0m
+[90mSaving to disk: 1932.10 sec[0m
+[DIAG]   window=3 O_size_so_far=4764603483 rawMemUsed=440337 MB avgBytesPerHash=370.33
+[DIAG]   window=4 slots=[4757872640, 5946925056) maxNumHashes=1189054025
+[90mCollecting and combining like terms: 4936.98 sec[0m
+[90mSaving to disk: 1961.44 sec[0m
+[DIAG]   window=4 O_size_so_far=5955460475 rawMemUsed=440384 MB avgBytesPerHash=370.34
+[DIAG]   window=5 slots=[5946925056, 7135952896) maxNumHashes=1189029247
+[90mCollecting and combining like terms: 4947.26 sec[0m
+[90mSaving to disk: 1982.60 sec[0m
+[DIAG]   window=5 O_size_so_far=7146193253 rawMemUsed=440336 MB avgBytesPerHash=370.33
+[DIAG]   window=6 slots=[7135952896, 8324982784) maxNumHashes=1189030385
+[90mCollecting and combining like terms: 4948.41 sec[0m
+[90mSaving to disk: 2127.44 sec[0m
+[DIAG]   window=6 O_size_so_far=8336962071 rawMemUsed=440351 MB avgBytesPerHash=370.34
+[DIAG]   window=7 slots=[8324982784, 9514008576) maxNumHashes=1189025818
+[90mCollecting and combining like terms: 4935.18 sec[0m
+[90mSaving to disk: 2183.21 sec[0m
+[DIAG]   window=7 O_size_so_far=9527674694 rawMemUsed=440330 MB avgBytesPerHash=370.34
+[DIAG]   window=8 slots=[9514008576, 10703036416) maxNumHashes=1189028794
+[90mCollecting and combining like terms: 4945.07 sec[0m
+[90mSaving to disk: 2080.50 sec[0m
+[DIAG]   window=8 O_size_so_far=10718464576 rawMemUsed=440359 MB avgBytesPerHash=370.34
+[DIAG]   window=9 slots=[10703036416, 11892058112) maxNumHashes=1189022820
+[90mCollecting and combining like terms: 4939.14 sec[0m
+[90mSaving to disk: 2135.46 sec[0m
+[DIAG]   window=9 O_size_so_far=11909179812 rawMemUsed=440333 MB avgBytesPerHash=370.34
+[DIAG]   window=10 slots=[11892058112, 13081081856) maxNumHashes=1189024416
+[90mCollecting and combining like terms: 4941.60 sec[0m
+[90mSaving to disk: 2372.86 sec[0m
+[DIAG]   window=10 O_size_so_far=13099927228 rawMemUsed=440343 MB avgBytesPerHash=370.34
+[DIAG]   window=11 slots=[13081081856, 14270103552) maxNumHashes=1189023381
+[90mCollecting and combining like terms: 4911.70 sec[0m
+[90mSaving to disk: 2374.45 sec[0m
+[DIAG]   window=11 O_size_so_far=14290702515 rawMemUsed=440353 MB avgBytesPerHash=370.34
+[DIAG]   window=12 slots=[14270103552, 15459123200) maxNumHashes=1189020054
+[90mCollecting and combining like terms: 4918.03 sec[0m
+[90mSaving to disk: 2336.73 sec[0m
+[DIAG]   window=12 O_size_so_far=15481392869 rawMemUsed=440322 MB avgBytesPerHash=370.34
+[DIAG]   window=13 slots=[15459123200, 16635286208) maxNumHashes=1189023538
+[90mCollecting and combining like terms: 4876.32 sec[0m
+[90mSaving to disk: 2448.58 sec[0m
+[DIAG]   window=13 O_size_so_far=16659235832 rawMemUsed=435574 MB avgBytesPerHash=370.34
+Layer 23 computed; total terms: 16659235832 (x2.90 from previous layer)
+Written to disk: ~2302465 MB (x3.00 from previous layer)
+Actual disk usage: ~2319376 MB (x2.99 from previous layer)
+Total time on layer: 98969.53 sec (x5.19 from previous layer)
+
+Computation took 125993.44 sec

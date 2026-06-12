@@ -13,6 +13,7 @@
 #include <filesystem>
 #include <unordered_set>
 #include <cmath>
+#include <iomanip>
 #include <sys/wait.h>
 #include <sys/stat.h>
 #include "Poly2.h"
@@ -377,8 +378,20 @@ std::string help =
 int
 main(int argc, char** argv)
 {
+    // Show help when the program is invoked with no arguments so that it does
+    // not crash on the unconditional argv[1] access further below.
+    if(argc <= 1) {
+        std::cout << "Usage: " << argv[0] << " " << help_usage6 << std::endl;
+        std::cout << "Run '" << argv[0] << " --help' for full usage information." << std::endl;
+        return 1;
+    }
+
     if(std::string(argv[1]) == "--version") {
         std::cout << "Commutators v1.0" << std::endl;
+        std::cout << std::endl;
+        std::cout << "Copyright (c) 2025 Ilya Shirokov, Viacheslav Khrushchev" << std::endl;
+        std::cout << "Licensed under Creative Commons Attribution-NoDerivatives 4.0 International." << std::endl;
+        std::cout << "See https://creativecommons.org/licenses/by-nd/4.0/ for the full license text." << std::endl;
         return 0;
     } else if(std::string(argv[1]) == "--help") {
         std::cout << "Usage: " << argv[0] << " " << help_usage1 << std::endl;
@@ -619,6 +632,14 @@ main(int argc, char** argv)
 
         auto timeLayerStart = Clock::now();
         size_t tableSize = std::max((size_t)1, (size_t)std::ceil(prevExpansionRatio * O_size));
+#ifdef DEBUG
+        std::cerr << "[DIAG] layer=" << t+1
+                  << " O_size=" << O_size
+                  << " prevExpRatio=" << std::fixed << std::setprecision(6) << prevExpansionRatio
+                  << " tableSize=" << tableSize
+                  << " avgBytesPerHash=" << std::setprecision(2) << averageBytesPerHash
+                  << std::endl;
+#endif
 
         auto safeSubtract = [](size_t x, size_t y) {
             return (x >= y) ? (x - y) : 0;
@@ -632,9 +653,17 @@ main(int argc, char** argv)
         size_t curRealDiskSize = 0;
         size_t sumOfMemoryUsages = 0;
         // commute all terms of O with the Hamiltonian
+        size_t windowIndex = 0;
         for(size_t i = 0; i < tableSize;) {
             size_t maxNumHashes = safeSubtract(config.memoryLimitInBytes, fixedMemoryUsage) / averageBytesPerHash;
             size_t numHashes = std::min(tableSize - i, std::max((size_t)BLOCK_SIZE, maxNumHashes - maxNumHashes % BLOCK_SIZE));
+
+#ifdef DEBUG
+            std::cerr << "[DIAG]   window=" << windowIndex
+                      << " slots=[" << i << ", " << i + numHashes << ")"
+                      << " maxNumHashes=" << maxNumHashes
+                      << std::endl;
+#endif
 
             ComputationResult res = computePartOfNextLayer(H, prevTableSize, t + 1, tableSize, i, i + numHashes);
 
@@ -643,7 +672,17 @@ main(int argc, char** argv)
             curRealDiskSize += res.realDiskSize;
             sumOfMemoryUsages += res.maxMemoryUsed;
             averageBytesPerHash = std::max((double)sumOfMemoryUsages / (i + numHashes), (double)(sizeof(Node) + sizeof(Node*)));
+
+#ifdef DEBUG
+            std::cerr << "[DIAG]   window=" << windowIndex
+                      << " O_size_so_far=" << cur_O_size
+                      << " rawMemUsed=" << res.maxMemoryUsed / 1'000'000 << " MB"
+                      << " avgBytesPerHash=" << std::setprecision(2) << averageBytesPerHash
+                      << std::endl;
+#endif
+
             i += numHashes;
+            windowIndex++;
         }
         curRealDiskSize += getLogicalFileSize(config.directoryPath + "/" + std::to_string(t + 1));
 

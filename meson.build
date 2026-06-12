@@ -1,4 +1,6 @@
-project('commutators', 'cpp')
+project('commutators', 'cpp', version : '1.0',
+  default_options : ['warning_level=1'])
+
 # Setting the C++ standard should be in default_options,
 # but a Meson bug open since 2019 prevents us from putting the setting there
 if meson.get_compiler('cpp').get_id() == 'gcc' or meson.get_compiler('cpp').get_id() == 'clang'
@@ -6,10 +8,16 @@ if meson.get_compiler('cpp').get_id() == 'gcc' or meson.get_compiler('cpp').get_
   add_project_arguments('-march=native', language : 'cpp')
 endif
 
-dependencies = []
+# Pass -DDEBUG to enable verbose [DIAG] diagnostic output.
+# Usage: meson setup --buildtype=debug build-debug -Ddebug_output=true
+option_debug = get_option('debug_output')
+if option_debug
+  add_project_arguments('-DDEBUG', language : 'cpp')
+  message('Debug diagnostic output enabled (-DDEBUG)')
+endif
 
+dependencies = []
 dependencies += dependency('gmp')
-# dependencies += subproject('catch2').get_variable('catch2_with_main_dep')
 
 src_files = [
     'main.cpp',
@@ -21,4 +29,3 @@ src_files = [
 ]
 executable('main', src_files, dependencies : dependencies)
 
-#executable('collect_stats', 'collect_stats.cpp')

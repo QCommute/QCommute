@@ -1,0 +1,12 @@
+# Build directories
+build-release/
+build-debug/
+
+# Computation output
+tmp/
+
+# VS Code personal settings
+.vscode/
+
+# Compiled binary (if built in root)
+main
