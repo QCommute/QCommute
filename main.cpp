@@ -380,7 +380,7 @@ main(int argc, char** argv)
 {
     // Print a short identification banner on every invocation, as required by
     // SciPost Codebases guidelines ("print version and licence at startup").
-    std::cerr << "Commutators v1.0  |  Copyright (c) 2025 Ilya Shirokov, Viacheslav Khrushchev" << std::endl;
+    std::cerr << "QCommute v1.0  |  Copyright (c) 2025 Ilya Shirokov, Viacheslav Khrushchev" << std::endl;
     std::cerr << "License: CC BY-ND 4.0  <https://creativecommons.org/licenses/by-nd/4.0/>" << std::endl;
     std::cerr << std::endl;
 
