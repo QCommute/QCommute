@@ -234,12 +234,11 @@ used to compare two human-readable Pauli-string files:
 
 ## Licence
 
-Copyright © 2025 Ilya Shirokov, Viacheslav Khrushchev.
+Copyright © 2026 Ilya Shirokov, Viacheslav Khrushchev.
 
-Licensed under **Creative Commons Attribution-NoDerivatives 4.0 International**
-(CC BY-ND 4.0).  You are free to copy and redistribute the material for any
-purpose, even commercially, provided you give appropriate credit and do **not**
-distribute modified versions.
+Licensed under **Creative Commons Attribution 4.0 International**
+(CC BY 4.0).  You are free to copy and redistribute the material for any
+purpose, even commercially, provided you give appropriate credit.
 
-See [LICENSE](LICENSE) or <https://creativecommons.org/licenses/by-nd/4.0/> for
+See [LICENSE](LICENSE) or <https://creativecommons.org/licenses/by/4.0/> for
 the full licence text.
