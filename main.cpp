@@ -685,8 +685,8 @@ std::string help_usage6 = "--version";
 std::string help_usage7 = "[FILE] [OPTION]...";
 
 int main(int argc, char** argv) {
-    std::cerr << "QCommute v1.0  |  Copyright (c) 2025 Ilya Shirokov, Viacheslav Khrushchev" << std::endl;
-    std::cerr << "License: CC BY-ND 4.0  <https://creativecommons.org/licenses/by-nd/4.0/>" << std::endl;
+    std::cerr << "QCommute v1.0  |  Copyright (c) 2026 Ilya Shirokov, Viacheslav Khrushchev" << std::endl;
+    std::cerr << "License: CC BY 4.0  <https://creativecommons.org/licenses/by/4.0/>" << std::endl;
     std::cerr << std::endl;
 
     if (argc <= 1) {
