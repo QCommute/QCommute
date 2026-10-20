@@ -1,28 +1,52 @@
+```yaml
 cff-version: 1.2.0
-message: "If you use this software, please cite it as below."
+message: "If you use this software, please cite both the software paper and the accompanying physics article below."
 authors:
-  - family-names: "Shirokov"  
-    given-names: "Ilya"     
-  - family-names: "Lychkovskiy"  
+  - family-names: "Shirokov"
+    given-names: "Ilya"
+  - family-names: "Lychkovskiy"
     given-names: "Oleg"
-  - family-names: "Khrushchev"  
+  - family-names: "Khrushchev"
     given-names: "Viacheslav"
-title: "QCommute"           
-version: "1.0"           
-date-released: 2024-05-20   
-url: "https://github.com/QCommute/QCommute" 
-
+title: "QCommute"
+version: "1.1"
+date-released: 2026-10-20
+url: "https://github.com/QCommute/QCommute"
 
 preferred-citation:
   type: article
   authors:
-  - family-names: "Shirokov"  
-    given-names: "Ilya"     
-  - family-names: "Lychkovskiy"  
-    given-names: "Oleg"
-  - family-names: "Khrushchev"  
-    given-names: "Viacheslav"
-  title: "QCOMMUTE: a tool for symbolic computation of nested commutators in quantum many-body spin-1/2 systems"
-  journal: "SciPost Physics Codebases" 
+    - family-names: "Lychkovskiy"
+      given-names: "Oleg"
+    - family-names: "Khrushchev"
+      given-names: "Viacheslav"
+    - family-names: "Shirokov"
+      given-names: "Ilya"
+  title: "QCommute: A tool for symbolic computation of nested commutators in quantum many-body spin-1/2 systems"
+  journal: "SciPost Physics Codebases"
+  volume: 84
   year: 2026
-  # doi: "10.21468/SciPostPhys..."
+  doi: "10.21468/SciPostPhysCodeb.84"
+
+references:
+  - type: article
+    authors:
+      - family-names: "Shirokov"
+        given-names: "Ilya"
+      - family-names: "Khrushchev"
+        given-names: "Viacheslav"
+      - family-names: "Uskov"
+        given-names: "Filipp"
+      - family-names: "Dudinets"
+        given-names: "Ivan"
+      - family-names: "Ermakov"
+        given-names: "Igor"
+      - family-names: "Lychkovskiy"
+        given-names: "Oleg"
+    title: "Recursion method for quench dynamics: Strengths and limitations"
+    journal: "SciPost Physics Core"
+    volume: 9
+    issue: 3
+    start: "049"
+    year: 2026
+    doi: "10.21468/SciPostPhysCore.9.3.049"
