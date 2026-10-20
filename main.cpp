@@ -10,7 +10,10 @@
 #include <cstdlib>
 #include <cstring>
 #include <cerrno>
+#include <map>
+#include <tuple>
 #include "Expression.h"
+#include "SerializationHelpers.h"
 #include <thread>
 #include <mutex>
 #include <atomic>
@@ -49,6 +52,18 @@ struct Config {
     double explicitAvgBytesPerHash = 0.0;
 };
 Config config;
+
+// Вспомогательная сериализация 64-битных чисел для чекпоинтов
+void serializeUInt64(std::vector<uint8_t>& res, uint64_t x) {
+    serializeUInt32(res, static_cast<uint32_t>(x & 0xFFFFFFFFULL));
+    serializeUInt32(res, static_cast<uint32_t>(x >> 32));
+}
+
+uint64_t deserializeUInt64(const std::vector<uint8_t>& data, size_t& ptr) {
+    uint64_t lo = deserializeUInt32(data, ptr);
+    uint64_t hi = deserializeUInt32(data, ptr);
+    return lo | (hi << 32);
+}
 
 std::string getFlatPathToHashTableFile(size_t level, size_t start) {
     return config.directoryPath + "/" + std::to_string(level) + "/" + std::to_string(start) + ".comm";
@@ -483,6 +498,9 @@ LayerMeta scanLayerDirectory(size_t level, double defaultAvgBytesPerHash) {
     return meta;
 }
 
+// ============================================================================
+// 1. `recover-layer` subcommand: recalculates lost `.comm` blocks in a single pass
+// ============================================================================
 int runRecoverLayer(const std::string& inputFile, const std::string& resDir,
                     size_t targetLevel, size_t prevTableSize, size_t curTableSize) {
     config.directoryPath = resDir;
@@ -676,16 +694,762 @@ int runRecoverLayer(const std::string& inputFile, const std::string& resDir,
     return 0;
 }
 
+// ============================================================================
+// 2. Next-layer-stats subcommand: calculates the moment and quench for layer n+1 IN MEMORY
+//    without saving layer n+1 .comm files to disk (using window-based checkpoints)
+// ============================================================================
+void saveWindowStatsCheckpoint(const std::string& chkPath, size_t minHash, size_t maxHash,
+                               size_t winOSize, size_t maxMemUsed,
+                               const Poly& momentPoly, const Poly& quenchPoly) {
+    std::vector<uint8_t> buf;
+    serializeUInt64(buf, minHash);
+    serializeUInt64(buf, maxHash);
+    serializeUInt64(buf, winOSize);
+    serializeUInt64(buf, maxMemUsed);
+    momentPoly.serialize(buf);
+    quenchPoly.serialize(buf);
+
+    std::string tmpPath = chkPath + ".tmp";
+    storeFile(tmpPath, buf);
+    std::filesystem::rename(tmpPath, chkPath);
+}
+
+bool loadWindowStatsCheckpoint(const std::string& chkPath, size_t& minHash, size_t& maxHash,
+                               size_t& winOSize, size_t& maxMemUsed,
+                               Poly& momentPoly, Poly& quenchPoly) {
+    if (!std::filesystem::exists(chkPath) || getLogicalFileSize(chkPath) == 0)
+        return false;
+    std::vector<uint8_t> buf = loadFile(chkPath);
+    size_t ptr = 0;
+    minHash = deserializeUInt64(buf, ptr);
+    maxHash = deserializeUInt64(buf, ptr);
+    winOSize = deserializeUInt64(buf, ptr);
+    maxMemUsed = deserializeUInt64(buf, ptr);
+    momentPoly = Poly(buf, ptr);
+    quenchPoly = Poly(buf, ptr);
+    return true;
+}
+
+ComputationResult computeNextLayerStatsWindowImpl(
+    const std::vector<Expression>& H, size_t prevTableSize,
+    size_t curLevelNum, size_t curTableSize,
+    size_t minHash, size_t maxHash, const std::string& chkPath)
+{
+    assert(minHash % BLOCK_SIZE == 0);
+    assert(maxHash >= curTableSize || maxHash % BLOCK_SIZE == 0);
+    assert(maxHash > minHash);
+
+    size_t memoryUsageStart = getMemoryUsage();
+    auto timeLayerStart = Clock::now();
+
+    Node** indices = new Node*[maxHash - minHash];
+    for (size_t i = 0; i < maxHash - minHash; i++)
+        indices[i] = nullptr;
+    std::mutex* indexMutexes = new std::mutex[(maxHash - minHash + 15) / 16];
+
+    size_t nextHash = 0;
+    std::mutex taskMutex;
+    size_t num_threads = std::thread::hardware_concurrency();
+    std::vector<std::thread> threads;
+
+    for (size_t tt = 0; tt < num_threads; tt++) {
+        threads.emplace_back([&]() {
+            while (true) {
+                size_t curHash;
+                {
+                    std::lock_guard<std::mutex> lock(taskMutex);
+                    if (nextHash >= prevTableSize)
+                        return;
+                    curHash = nextHash;
+                    nextHash += BLOCK_SIZE;
+                }
+
+                std::vector<Expression> expressionsCur =
+                    loadAndDeleteBlock(resolvePathToHashTableFileForRead(curLevelNum - 1, curHash));
+
+                for (size_t i = 0; i < H.size(); i++) {
+                    for (size_t j = 0; j < expressionsCur.size(); j++) {
+                        H[i].Commute(expressionsCur[j], [&](Expression&& newExpression) {
+                            size_t hash = ExpressionHasher()(newExpression);
+                            size_t slot = hash % curTableSize;
+                            if (slot < minHash || slot >= maxHash)
+                                return;
+                            size_t localSlot = slot - minHash;
+                            std::lock_guard<std::mutex> guard(indexMutexes[localSlot / 16]);
+                            Node* prev_node = nullptr;
+                            Node* cur_node = indices[localSlot];
+                            bool found = false;
+                            while (cur_node != nullptr) {
+                                if (cur_node->expr == newExpression) {
+                                    cur_node->expr.getPoly() += newExpression.getPoly();
+                                    found = true;
+                                    break;
+                                } else if (newExpression < cur_node->expr)
+                                    break;
+                                prev_node = cur_node;
+                                cur_node = cur_node->next;
+                            }
+                            if (!found) {
+                                if (prev_node == nullptr)
+                                    indices[localSlot] = new Node(std::move(newExpression), indices[localSlot]);
+                                else
+                                    prev_node->next = new Node(std::move(newExpression), cur_node);
+                            }
+                        });
+                    }
+                }
+            }
+        });
+    }
+    for (auto& th : threads)
+        th.join();
+
+    size_t memoryUsageEnd = getMemoryUsage();
+    delete[] indexMutexes;
+
+    auto timeLayerEnd = Clock::now();
+    std::cerr << "\e[90m" << "Collecting and combining like terms: "
+              << std::chrono::duration_cast<std::chrono::microseconds>(timeLayerEnd - timeLayerStart).count() / 1000000.0
+              << " sec" << "\e[0m" << std::endl;
+
+    // Вместо сброса гигабайтов на диск — редуцируем момент и квенч прямо в ОЗУ и освобождаем Node
+    std::atomic<size_t> nextReduceSlot{minHash};
+    std::atomic<size_t> totalTerms{0};
+    std::mutex mergeMutex;
+    Poly windowMoment;
+    std::map<std::tuple<size_t, size_t, size_t>, Poly> globalQuenchMap;
+
+    std::vector<std::thread> reduceThreads;
+    for (size_t tt = 0; tt < num_threads; tt++) {
+        reduceThreads.emplace_back([&]() {
+            Poly localMoment;
+            std::map<std::tuple<size_t, size_t, size_t>, Poly> localQuenchMap;
+            size_t localCount = 0;
+
+            while (true) {
+                size_t start = nextReduceSlot.fetch_add(BLOCK_SIZE, std::memory_order_relaxed);
+                if (start >= maxHash)
+                    break;
+                size_t end = std::min(start + BLOCK_SIZE, maxHash);
+                for (size_t s = start; s < end; ++s) {
+                    Node* cur_node = indices[s - minHash];
+                    while (cur_node != nullptr) {
+                        Node* next_node = cur_node->next;
+                        if (!cur_node->expr.getPoly().isZero()) {
+                            localCount++;
+                            const Poly& p = cur_node->expr.getPoly();
+                            localMoment += (p * p);
+                            auto sigCounts = cur_node->expr.getNumSigmas();
+                            localQuenchMap[sigCounts] += p;
+                        }
+                        delete cur_node;
+                        cur_node = next_node;
+                    }
+                    indices[s - minHash] = nullptr;
+                }
+            }
+
+            totalTerms.fetch_add(localCount, std::memory_order_relaxed);
+            std::lock_guard<std::mutex> lock(mergeMutex);
+            windowMoment += localMoment;
+            for (const auto& [sigTriple, polySum] : localQuenchMap) {
+                globalQuenchMap[sigTriple] += polySum;
+            }
+        });
+    }
+    for (auto& th : reduceThreads)
+        th.join();
+    delete[] indices;
+
+    // Собираем финальный полином квенча окна из сгруппированных троек (nx, ny, nz)
+    Poly windowQuench;
+    for (const auto& [sigTriple, polySum] : globalQuenchMap) {
+        if (polySum.isZero())
+            continue;
+        auto [nx, ny, nz] = sigTriple;
+        Poly multiplyBy = Poly("[1," + std::to_string(nx) + "," + std::to_string(ny) + "," + std::to_string(nz) + "]");
+        windowQuench += polySum.prependVariables(3) * multiplyBy;
+    }
+
+    size_t maxMem = (memoryUsageEnd >= memoryUsageStart) ? (memoryUsageEnd - memoryUsageStart) : 0;
+    saveWindowStatsCheckpoint(chkPath, minHash, maxHash, totalTerms.load(), maxMem, windowMoment, windowQuench);
+
+    auto timeReduceEnd = Clock::now();
+    std::cerr << "\e[90m" << "In-memory stats reduction & checkpoint: "
+              << std::chrono::duration_cast<std::chrono::microseconds>(timeReduceEnd - timeLayerEnd).count() / 1000000.0
+              << " sec" << "\e[0m" << std::endl;
+
+    return {totalTerms.load(), 0, 0, maxMem};
+}
+
+ComputationResult computeNextLayerStatsWindow(
+    const std::vector<Expression>& H, size_t prevTableSize,
+    size_t curLevelNum, size_t curTableSize,
+    size_t minHash, size_t maxHash, const std::string& chkPath)
+{
+    int pipefd[2];
+    if (pipe(pipefd) != 0) std::abort();
+    int fork_res = fork();
+    if (fork_res < 0) std::abort();
+    if (fork_res == 0) {
+        close(pipefd[0]);
+        ComputationResult res = computeNextLayerStatsWindowImpl(
+            H, prevTableSize, curLevelNum, curTableSize, minHash, maxHash, chkPath);
+        ssize_t written = 0;
+        while (written < static_cast<ssize_t>(sizeof(ComputationResult))) {
+            ssize_t w = write(pipefd[1], reinterpret_cast<char*>(&res) + written, sizeof(ComputationResult) - written);
+            if (w <= 0) exit(1);
+            written += w;
+        }
+        close(pipefd[1]);
+        exit(0);
+    } else {
+        close(pipefd[1]);
+        int wstatus;
+        waitpid(fork_res, &wstatus, 0);
+        if (!(WIFEXITED(wstatus) && WEXITSTATUS(wstatus) == 0)) {
+            std::cerr << "Child failed in computeNextLayerStatsWindow" << std::endl;
+            exit(1);
+        }
+        ComputationResult res;
+        ssize_t read_ = 0;
+        while (read_ < static_cast<ssize_t>(sizeof(ComputationResult))) {
+            ssize_t r = read(pipefd[0], reinterpret_cast<char*>(&res) + read_, sizeof(ComputationResult) - read_);
+            if (r <= 0) exit(1);
+            read_ += r;
+        }
+        close(pipefd[0]);
+        return res;
+    }
+}
+
+// Запуск: ./QCommute next-layer-stats <FILE> <RES_DIR> <BASE_LAYER> --memory-limit MB [--layer-meta O_size tableSize expRatio avgBytes]
+int runNextLayerStats(int argc, char** argv) {
+    if (argc < 5) {
+        std::cerr << "Usage: " << argv[0] << " next-layer-stats [FILE] [RES_DIR] [BASE_LAYER] "
+                  << "[--memory-limit MB] [--layer-meta O_size tableSize expRatio avgBytes]" << std::endl;
+        return 1;
+    }
+    std::string inputFile = argv[2];
+    config.directoryPath = argv[3];
+    size_t baseLayer = std::stoull(argv[4]);
+    size_t targetLayer = baseLayer + 1;
+    config.memoryLimitInBytes = std::numeric_limits<size_t>::max();
+    config.hasExplicitMeta = false;
+
+    for (int i = 5; i < argc;) {
+        if (std::string(argv[i]) == "--memory-limit") {
+            config.memoryLimitInBytes = std::stoull(argv[i + 1]) * 1'048'576;
+            i += 2;
+        } else if (std::string(argv[i]) == "--layer-meta") {
+            config.hasExplicitMeta = true;
+            config.explicitOSize = std::stoull(argv[i + 1]);
+            config.explicitTableSize = std::stoull(argv[i + 2]);
+            config.explicitExpRatio = std::stod(argv[i + 3]);
+            config.explicitAvgBytesPerHash = std::stod(argv[i + 4]);
+            i += 5;
+        } else {
+            std::cerr << "Unknown option: " << argv[i] << std::endl;
+            return 1;
+        }
+    }
+
+    std::vector<Expression> H;
+    std::ifstream file(inputFile);
+    if (!file) {
+        std::cerr << "Error: Cannot open input file " << inputFile << std::endl;
+        return 1;
+    }
+    std::string str;
+    std::getline(file, str);
+    assert(str == "H:");
+    std::getline(file, str);
+    while (str != "O:") {
+        H.emplace_back(str);
+        std::getline(file, str);
+    }
+    file.close();
+
+    LayerMeta meta;
+    if (config.hasExplicitMeta) {
+        meta.O_size = config.explicitOSize;
+        meta.tableSize = config.explicitTableSize;
+        meta.expansionRatio = config.explicitExpRatio;
+        meta.avgBytesPerHash = config.explicitAvgBytesPerHash;
+    } else if (!loadLayerMeta(baseLayer, meta)) {
+        meta = scanLayerDirectory(baseLayer, 372.20);
+    }
+
+    size_t O_size = meta.O_size;
+    size_t prevTableSize = meta.tableSize;
+    double prevExpansionRatio = meta.expansionRatio;
+    double averageBytesPerHash = meta.avgBytesPerHash;
+    size_t tableSize = std::max<size_t>(1, static_cast<size_t>(std::ceil(prevExpansionRatio * O_size)));
+
+    std::string statsDir = config.directoryPath + "/stats_layer_" + std::to_string(targetLayer);
+    std::filesystem::create_directories(statsDir);
+
+    std::cerr << "[next-layer-stats] Computing in-memory stats for Layer " << targetLayer
+              << " from Layer " << baseLayer << std::endl;
+    std::cerr << "[DIAG] layer=" << targetLayer << " base_O_size=" << O_size
+              << " prevTableSize=" << prevTableSize << " targetTableSize=" << tableSize
+              << " avgBytesPerHash=" << averageBytesPerHash << std::endl;
+
+    auto safeSubtract = [](size_t x, size_t y) { return (x >= y) ? (x - y) : 0; };
+    size_t memoryUsagePerOldExpression = safeSubtract(averageBytesPerHash, (sizeof(Node) - sizeof(Expression)) + sizeof(std::mutex) / 16);
+    size_t fixedMemoryUsage = std::thread::hardware_concurrency() * (BLOCK_SIZE * memoryUsagePerOldExpression + 131'072);
+
+    size_t cur_O_size = 0;
+    size_t sumOfMemoryUsages = 0;
+    size_t windowIndex = 0;
+    Poly2 totalMoment;
+    Poly2 totalQuench;
+
+    auto timeLayerStart = Clock::now();
+    for (size_t i = 0; i < tableSize;) {
+        std::string chkPath = statsDir + "/window_" + std::to_string(windowIndex) + ".chk";
+        size_t chkMin = 0, chkMax = 0, chkOSize = 0, chkMem = 0;
+        Poly winMoment, winQuench;
+
+        if (loadWindowStatsCheckpoint(chkPath, chkMin, chkMax, chkOSize, chkMem, winMoment, winQuench) && chkMin == i) {
+            size_t numHashes = chkMax - chkMin;
+            cur_O_size += chkOSize;
+            sumOfMemoryUsages += chkMem;
+            averageBytesPerHash = std::max((double)sumOfMemoryUsages / (i + numHashes), (double)(sizeof(Node) + sizeof(Node*)));
+            totalMoment += Poly2(winMoment);
+            totalQuench += Poly2(winQuench);
+            std::cerr << "[CHECKPOINT] Loaded window=" << windowIndex << " slots=[" << chkMin << ", " << chkMax
+                      << ") O_size_so_far=" << cur_O_size << std::endl;
+            i = chkMax;
+            windowIndex++;
+            continue;
+        }
+
+        size_t maxNumHashes = safeSubtract(config.memoryLimitInBytes, fixedMemoryUsage) / averageBytesPerHash;
+        size_t numHashes = std::min(tableSize - i, std::max<size_t>(BLOCK_SIZE, maxNumHashes - maxNumHashes % BLOCK_SIZE));
+
+        std::cerr << "[DIAG]   window=" << windowIndex
+                  << " slots=[" << i << ", " << i + numHashes << ")"
+                  << " maxNumHashes=" << maxNumHashes << std::endl;
+
+        ComputationResult res = computeNextLayerStatsWindow(
+            H, prevTableSize, targetLayer, tableSize, i, i + numHashes, chkPath);
+
+        bool ok = loadWindowStatsCheckpoint(chkPath, chkMin, chkMax, chkOSize, chkMem, winMoment, winQuench);
+        assert(ok);
+        totalMoment += Poly2(winMoment);
+        totalQuench += Poly2(winQuench);
+
+        cur_O_size += res.O_size;
+        sumOfMemoryUsages += res.maxMemoryUsed;
+        averageBytesPerHash = std::max((double)sumOfMemoryUsages / (i + numHashes), (double)(sizeof(Node) + sizeof(Node*)));
+
+        std::cerr << "[DIAG]   window=" << windowIndex
+                  << " O_size_so_far=" << cur_O_size
+                  << " rawMemUsed=" << res.maxMemoryUsed / 1'000'000 << " MB"
+                  << " avgBytesPerHash=" << std::fixed << std::setprecision(2) << averageBytesPerHash << std::endl;
+
+        i += numHashes;
+        windowIndex++;
+    }
+
+    double totalTime = std::chrono::duration_cast<std::chrono::microseconds>(Clock::now() - timeLayerStart).count() / 1000000.0;
+    std::cerr << "Layer " << targetLayer << " stats completed in " << totalTime
+              << " sec; total unique terms: " << cur_O_size << std::endl;
+
+    std::cout << "(* Layer " << targetLayer << " total terms: " << cur_O_size << " *)" << std::endl;
+    std::cout << "moment_" << targetLayer << " = ";
+    totalMoment.printAsMathematica(0, [](size_t ind) {
+        return "h" + std::to_string(ind);
+    });
+    std::cout << ";" << std::endl << std::endl;
+
+    std::cout << "quenchCoef_" << targetLayer << " = ";
+    totalQuench.printAsMathematica(3, [](size_t ind) {
+        if (ind < 3)
+            return "p" + std::string(1, 'x' + ind);
+        return "h" + std::to_string(ind - 3);
+    });
+    std::cout << ";" << std::endl;
+
+    return 0;
+}
+
+// ============================================================================
+// 3. Подкоманда quench-z: алгоритм досчета m шагов для z-поляризации
+// ============================================================================
+inline bool passesXYFilter(const Expression& expr, size_t maxXY) {
+    auto [nx, ny, nz] = expr.getNumSigmas();
+    return (nx <= maxXY) && (ny <= maxXY);
+}
+
+ComputationResult computeFilteredLayerWindowImpl(
+    const std::vector<Expression>& H, size_t prevTableSize,
+    const std::string& prevLayerDir, const std::string& curLayerDir,
+    size_t curTableSize, size_t minHash, size_t maxHash,
+    size_t maxXY_in, size_t maxXY_out)
+{
+    size_t memoryUsageStart = getMemoryUsage();
+
+    Node** indices = new Node*[maxHash - minHash];
+    for (size_t i = 0; i < maxHash - minHash; i++)
+        indices[i] = nullptr;
+    std::mutex* indexMutexes = new std::mutex[(maxHash - minHash + 15) / 16];
+
+    size_t nextHash = 0;
+    std::mutex taskMutex;
+    size_t num_threads = std::thread::hardware_concurrency();
+    std::vector<std::thread> threads;
+
+    for (size_t tt = 0; tt < num_threads; tt++) {
+        threads.emplace_back([&]() {
+            while (true) {
+                size_t curHash;
+                {
+                    std::lock_guard<std::mutex> lock(taskMutex);
+                    if (nextHash >= prevTableSize) return;
+                    curHash = nextHash;
+                    nextHash += BLOCK_SIZE;
+                }
+
+                std::string fpath = prevLayerDir + "/" + std::to_string(curHash) + ".comm";
+                if (!std::filesystem::exists(fpath)) {
+                    std::string rec = prevLayerDir + "/recovered/" + std::to_string(curHash) + ".comm";
+                    if (std::filesystem::exists(rec)) fpath = rec;
+                    else {
+                        size_t shardIdx = (curHash / BLOCK_SIZE) / FILES_PER_SHARD;
+                        fpath = prevLayerDir + "/shard_" + std::to_string(shardIdx) + "/" + std::to_string(curHash) + ".comm";
+                    }
+                }
+
+                std::vector<Expression> expressionsCur = loadAndDeleteBlock(fpath);
+
+                for (size_t j = 0; j < expressionsCur.size(); j++) {
+                    if (!passesXYFilter(expressionsCur[j], maxXY_in))
+                        continue;
+
+                    for (size_t i = 0; i < H.size(); i++) {
+                        H[i].Commute(expressionsCur[j], [&](Expression&& newExpression) {
+                            if (!passesXYFilter(newExpression, maxXY_out))
+                                return;
+
+                            size_t hash = ExpressionHasher()(newExpression);
+                            size_t slot = hash % curTableSize;
+                            if (slot < minHash || slot >= maxHash)
+                                return;
+
+                            size_t localSlot = slot - minHash;
+                            std::lock_guard<std::mutex> guard(indexMutexes[localSlot / 16]);
+                            Node* prev_node = nullptr;
+                            Node* cur_node = indices[localSlot];
+                            bool found = false;
+                            while (cur_node != nullptr) {
+                                if (cur_node->expr == newExpression) {
+                                    cur_node->expr.getPoly() += newExpression.getPoly();
+                                    found = true;
+                                    break;
+                                } else if (newExpression < cur_node->expr)
+                                    break;
+                                prev_node = cur_node;
+                                cur_node = cur_node->next;
+                            }
+                            if (!found) {
+                                if (prev_node == nullptr)
+                                    indices[localSlot] = new Node(std::move(newExpression), indices[localSlot]);
+                                else
+                                    prev_node->next = new Node(std::move(newExpression), cur_node);
+                            }
+                        });
+                    }
+                }
+            }
+        });
+    }
+    for (auto& th : threads) th.join();
+
+    size_t memoryUsageEnd = getMemoryUsage();
+    delete[] indexMutexes;
+
+    size_t totalFiles = (curTableSize + BLOCK_SIZE - 1) / BLOCK_SIZE;
+    bool useShards = (totalFiles >= SHARDING_THRESHOLD_FILES);
+    if (useShards) {
+        size_t firstShard = (minHash / BLOCK_SIZE) / FILES_PER_SHARD;
+        size_t lastShard = ((maxHash - 1) / BLOCK_SIZE) / FILES_PER_SHARD;
+        for (size_t s = firstShard; s <= lastShard; ++s)
+            std::filesystem::create_directories(curLayerDir + "/shard_" + std::to_string(s));
+    }
+
+    std::atomic<size_t> nextSaveHash{minHash};
+    std::atomic<size_t> totalAdded{0}, totalWritten{0}, totalReal{0};
+    std::vector<std::thread> saveThreads;
+
+    for (size_t tt = 0; tt < num_threads; tt++) {
+        saveThreads.emplace_back([&]() {
+            while (true) {
+                size_t start = nextSaveHash.fetch_add(BLOCK_SIZE, std::memory_order_relaxed);
+                if (start >= maxHash) break;
+
+                std::vector<Expression> exprs;
+                for (size_t i = start; i < std::min(start + BLOCK_SIZE, maxHash); i++) {
+                    Node* cur_node = indices[i - minHash];
+                    while (cur_node != nullptr) {
+                        Node* next_node = cur_node->next;
+                        if (!cur_node->expr.getPoly().isZero())
+                            exprs.push_back(std::move(cur_node->expr));
+                        delete cur_node;
+                        cur_node = next_node;
+                    }
+                    indices[i - minHash] = nullptr;
+                }
+                std::string outPath;
+                if (useShards) {
+                    size_t shardIdx = (start / BLOCK_SIZE) / FILES_PER_SHARD;
+                    outPath = curLayerDir + "/shard_" + std::to_string(shardIdx) + "/" + std::to_string(start) + ".comm";
+                } else {
+                    outPath = curLayerDir + "/" + std::to_string(start) + ".comm";
+                }
+                auto [wSize, rSize] = storeBlock(outPath, exprs);
+                totalAdded.fetch_add(exprs.size(), std::memory_order_relaxed);
+                totalWritten.fetch_add(wSize, std::memory_order_relaxed);
+                totalReal.fetch_add(rSize, std::memory_order_relaxed);
+            }
+        });
+    }
+    for (auto& th : saveThreads) th.join();
+    delete[] indices;
+
+    return {totalAdded.load(), totalWritten.load(), totalReal.load(),
+            (memoryUsageEnd >= memoryUsageStart) ? (memoryUsageEnd - memoryUsageStart) : 0};
+}
+
+ComputationResult computeFilteredLayerWindow(
+    const std::vector<Expression>& H, size_t prevTableSize,
+    const std::string& prevLayerDir, const std::string& curLayerDir,
+    size_t curTableSize, size_t minHash, size_t maxHash,
+    size_t maxXY_in, size_t maxXY_out)
+{
+    int pipefd[2];
+    if (pipe(pipefd) != 0) std::abort();
+    int fork_res = fork();
+    if (fork_res == 0) {
+        close(pipefd[0]);
+        ComputationResult res = computeFilteredLayerWindowImpl(
+            H, prevTableSize, prevLayerDir, curLayerDir, curTableSize, minHash, maxHash, maxXY_in, maxXY_out);
+        ssize_t written = 0;
+        while (written < static_cast<ssize_t>(sizeof(ComputationResult)))
+            written += write(pipefd[1], reinterpret_cast<char*>(&res) + written, sizeof(ComputationResult) - written);
+        close(pipefd[1]);
+        exit(0);
+    } else {
+        close(pipefd[1]);
+        int wstatus;
+        waitpid(fork_res, &wstatus, 0);
+        if (!(WIFEXITED(wstatus) && WEXITSTATUS(wstatus) == 0)) {
+            std::cerr << "Child failed in computeFilteredLayerWindow" << std::endl;
+            exit(1);
+        }
+        ComputationResult res;
+        ssize_t read_ = 0;
+        while (read_ < static_cast<ssize_t>(sizeof(ComputationResult)))
+            read_ += read(pipefd[0], reinterpret_cast<char*>(&res) + read_, sizeof(ComputationResult) - read_);
+        close(pipefd[0]);
+        return res;
+    }
+}
+
+std::pair<Poly2, size_t> extractZQuenchAndCountB0(const std::string& layerDir, size_t maxXY_for_B0, size_t& outMaxStart) {
+    auto it = std::filesystem::recursive_directory_iterator(layerDir);
+    Poly2 res;
+    std::atomic<size_t> b0Count{0};
+    std::atomic<size_t> maxStartAtom{0};
+    std::mutex taskMutex, resMutex;
+    size_t num_threads = std::thread::hardware_concurrency();
+    std::vector<std::thread> threads;
+
+    for (size_t tt = 0; tt < num_threads; tt++) {
+        threads.emplace_back([&]() {
+            std::map<size_t, Poly> localZMap;
+            size_t localB0 = 0;
+            size_t localMaxStart = 0;
+            while (true) {
+                std::unique_lock<std::mutex> lock(taskMutex);
+                while (it != std::filesystem::recursive_directory_iterator{} &&
+                       !(it->is_regular_file() && it->path().extension() == ".comm")) {
+                    ++it;
+                }
+                if (it == std::filesystem::recursive_directory_iterator{})
+                    break;
+                std::string filepath = it->path().string();
+                size_t startVal = std::stoull(it->path().stem().string());
+                ++it;
+                lock.unlock();
+
+                if (startVal > localMaxStart) localMaxStart = startVal;
+
+                std::vector<Expression> expressions = loadAndDeleteBlock(filepath);
+                for (const Expression& expr : expressions) {
+                    auto [nx, ny, nz] = expr.getNumSigmas();
+                    if (nx <= maxXY_for_B0 && ny <= maxXY_for_B0)
+                        localB0++;
+                    if (nx == 0 && ny == 0) {
+                        localZMap[nz] += expr.getPoly();
+                    }
+                }
+            }
+            Poly2 localRes;
+            for (const auto& [nz, pSum] : localZMap) {
+                if (!pSum.isZero()) {
+                    Poly multiplyBy = Poly("[1," + std::to_string(nz) + "]");
+                    localRes += Poly2(pSum.prependVariables(1) * multiplyBy);
+                }
+            }
+            b0Count.fetch_add(localB0, std::memory_order_relaxed);
+            size_t curMax = maxStartAtom.load();
+            while (localMaxStart > curMax && !maxStartAtom.compare_exchange_weak(curMax, localMaxStart)) {}
+            std::lock_guard<std::mutex> lock2(resMutex);
+            res += localRes;
+        });
+    }
+    for (auto& th : threads) th.join();
+    outMaxStart = maxStartAtom.load();
+    return {res, b0Count.load()};
+}
+
+int runQuenchZExtension(int argc, char** argv) {
+    if (argc < 6) {
+        std::cerr << "Usage: " << argv[0] << " quench-z [FILE] [RES_DIR] [N_MAX] [M] [--memory-limit MB] [--keep-temp]" << std::endl;
+        return 1;
+    }
+    std::string inputFile = argv[2];
+    config.directoryPath = argv[3];
+    size_t n_max = std::stoull(argv[4]);
+    size_t m = std::stoull(argv[5]);
+    config.memoryLimitInBytes = std::numeric_limits<size_t>::max();
+    bool keepTemp = false;
+
+    for (int i = 6; i < argc;) {
+        if (std::string(argv[i]) == "--memory-limit") {
+            config.memoryLimitInBytes = std::stoull(argv[i + 1]) * 1'048'576;
+            i += 2;
+        } else if (std::string(argv[i]) == "--keep-temp") {
+            keepTemp = true;
+            i++;
+        } else {
+            std::cerr << "Unknown option: " << argv[i] << std::endl;
+            return 1;
+        }
+    }
+
+    std::vector<Expression> H;
+    std::ifstream file(inputFile);
+    std::string str;
+    std::getline(file, str);
+    assert(str == "H:");
+    std::getline(file, str);
+    while (str != "O:") {
+        H.emplace_back(str);
+        std::getline(file, str);
+    }
+    file.close();
+
+    std::string baseLayerDir = config.directoryPath + "/" + std::to_string(n_max);
+    std::cerr << "Scanning layer n_max=" << n_max << " for B_0 = >L^" << n_max << " A<_" << m << " ..." << std::endl;
+    size_t maxStart = 0;
+    auto [quenchNMax, b0_size] = extractZQuenchAndCountB0(baseLayerDir, m, maxStart);
+    size_t prevTableSize = maxStart + BLOCK_SIZE;
+    size_t O_size = b0_size;
+
+    std::cerr << "B_0 size (terms with nx, ny <= " << m << "): " << O_size
+              << " (prevTableSize=" << prevTableSize << ")" << std::endl;
+
+    std::cout << "quenchZCoef = {" << std::endl;
+    std::cout << "(* Step " << n_max << " *)" << std::endl;
+    quenchNMax.printAsMathematica(1, [](size_t ind) {
+        if (ind == 0) return std::string("pz");
+        return "h" + std::to_string(ind - 1);
+    });
+
+    std::string workRoot = config.directoryPath + "/quench_z_from_" + std::to_string(n_max) + "_m" + std::to_string(m);
+    std::filesystem::create_directories(workRoot);
+
+    double prevExpansionRatio = 2.90;
+    double averageBytesPerHash = 375.0;
+    std::string prevDir = baseLayerDir;
+
+    for (size_t k = 1; k <= m; ++k) {
+        size_t maxXY_in  = (k == 1) ? m : (m - k + 1);
+        size_t maxXY_out = m - k;
+        std::string curDir = workRoot + "/B_" + std::to_string(k);
+        if (std::filesystem::exists(curDir))
+            std::filesystem::remove_all(curDir);
+        std::filesystem::create_directories(curDir);
+
+        size_t tableSize = std::max<size_t>(BLOCK_SIZE, static_cast<size_t>(std::ceil(prevExpansionRatio * std::max<size_t>(1, O_size))));
+        std::cerr << "\n\e[32m[quench-z] Step k=" << k << "/" << m
+                  << " (Layer " << n_max + k << ", filter >...<_" << maxXY_out << ")\e[0m"
+                  << " input_B_" << k - 1 << "_size=" << O_size
+                  << " tableSize=" << tableSize << std::endl;
+
+        auto safeSubtract = [](size_t x, size_t y) { return (x >= y) ? (x - y) : 0; };
+        size_t memoryUsagePerOldExpression = safeSubtract(averageBytesPerHash, (sizeof(Node) - sizeof(Expression)) + sizeof(std::mutex) / 16);
+        size_t fixedMemoryUsage = std::thread::hardware_concurrency() * (BLOCK_SIZE * memoryUsagePerOldExpression + 131'072);
+
+        size_t cur_O_size = 0;
+        size_t sumOfMemoryUsages = 0;
+        for (size_t i = 0; i < tableSize;) {
+            size_t maxNumHashes = safeSubtract(config.memoryLimitInBytes, fixedMemoryUsage) / averageBytesPerHash;
+            size_t numHashes = std::min(tableSize - i, std::max<size_t>(BLOCK_SIZE, maxNumHashes - maxNumHashes % BLOCK_SIZE));
+
+            ComputationResult res = computeFilteredLayerWindow(
+                H, prevTableSize, prevDir, curDir, tableSize, i, i + numHashes, maxXY_in, maxXY_out);
+
+            cur_O_size += res.O_size;
+            sumOfMemoryUsages += res.maxMemoryUsed;
+            if (res.maxMemoryUsed > 0)
+                averageBytesPerHash = std::max((double)sumOfMemoryUsages / (i + numHashes), (double)(sizeof(Node) + sizeof(Node*)));
+            i += numHashes;
+        }
+
+        size_t dummyMaxStart = 0;
+        auto [quenchCur, nextCount] = extractZQuenchAndCountB0(curDir, maxXY_out, dummyMaxStart);
+
+        std::cout << "," << std::endl;
+        std::cout << "(* Step " << n_max + k << " *)" << std::endl;
+        quenchCur.printAsMathematica(1, [](size_t ind) {
+            if (ind == 0) return std::string("pz");
+            return "h" + std::to_string(ind - 1);
+        });
+        std::cout.flush();
+
+        if (!keepTemp && k >= 2) {
+            std::filesystem::remove_all(prevDir);
+        }
+
+        if (O_size > 0 && cur_O_size > 0)
+            prevExpansionRatio = std::clamp((double)cur_O_size / O_size, 1.2, 3.0);
+        O_size = cur_O_size;
+        prevTableSize = tableSize;
+        prevDir = curDir;
+    }
+
+    if (!keepTemp && std::filesystem::exists(prevDir) && prevDir != baseLayerDir) {
+        std::filesystem::remove_all(prevDir);
+    }
+
+    std::cout << std::endl << "};" << std::endl;
+    return 0;
+}
+
 std::string help_usage1 = "validate [FILE1] [FILE2]";
 std::string help_usage2 = "momentum [DIRECTORY] [OPTIONAL_ONLY_LAYER]";
 std::string help_usage3 = "quench [DIRECTORY] [OPTIONAL_ONLY_LAYER]";
 std::string help_usage4 = "recover-layer [FILE] [RES_DIR] [LAYER] [PREV_TABLE_SIZE] [CUR_TABLE_SIZE]";
-std::string help_usage5 = "--help";
-std::string help_usage6 = "--version";
-std::string help_usage7 = "[FILE] [OPTION]...";
+std::string help_usage5 = "next-layer-stats [FILE] [RES_DIR] [BASE_LAYER] [--memory-limit MB] [--layer-meta ...]";
+std::string help_usage6 = "quench-z [FILE] [RES_DIR] [N_MAX] [M] [--memory-limit MB] [--keep-temp]";
+std::string help_usage7 = "--help | --version | [FILE] [OPTION]...";
 
 int main(int argc, char** argv) {
-    std::cerr << "QCommute v1.0  |  Copyright (c) 2026 Ilya Shirokov, Viacheslav Khrushchev" << std::endl;
+    std::cerr << "QCommute v1.1  |  Copyright (c) 2025-2026 Ilya Shirokov, Viacheslav Khrushchev" << std::endl;
     std::cerr << "License: CC BY 4.0  <https://creativecommons.org/licenses/by/4.0/>" << std::endl;
     std::cerr << std::endl;
 
@@ -711,12 +1475,11 @@ int main(int argc, char** argv) {
             std::cerr << "Usage: " << argv[0] << " " << help_usage4 << std::endl;
             return 1;
         }
-        std::string inputFile = argv[2];
-        std::string resDir = argv[3];
-        size_t targetLayer = std::stoull(argv[4]);
-        size_t prevTableSize = std::stoull(argv[5]);
-        size_t curTableSize = std::stoull(argv[6]);
-        return runRecoverLayer(inputFile, resDir, targetLayer, prevTableSize, curTableSize);
+        return runRecoverLayer(argv[2], argv[3], std::stoull(argv[4]), std::stoull(argv[5]), std::stoull(argv[6]));
+    } else if (std::string(argv[1]) == "next-layer-stats") {
+        return runNextLayerStats(argc, argv);
+    } else if (std::string(argv[1]) == "quench-z") {
+        return runQuenchZExtension(argc, argv);
     } else if (std::string(argv[1]) == "validate") {
         std::vector<Expression> src, new_;
         std::string str;
