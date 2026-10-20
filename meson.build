@@ -1,4 +1,4 @@
-project('commutators', 'cpp', version : '1.0',
+project('commutators', 'cpp', version : '1.1',
   default_options : ['warning_level=1'])
 
 # Setting the C++ standard should be in default_options,
