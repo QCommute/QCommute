@@ -733,7 +733,8 @@ bool loadWindowStatsCheckpoint(const std::string& chkPath, size_t& minHash, size
 ComputationResult computeNextLayerStatsWindowImpl(
     const std::vector<Expression>& H, size_t prevTableSize,
     size_t curLevelNum, size_t curTableSize,
-    size_t minHash, size_t maxHash, const std::string& chkPath)
+    size_t minHash, size_t maxHash, const std::string& chkPath,
+    bool computeMoment, bool computeQuench)
 {
     assert(minHash % BLOCK_SIZE == 0);
     assert(maxHash >= curTableSize || maxHash % BLOCK_SIZE == 0);
@@ -812,7 +813,6 @@ ComputationResult computeNextLayerStatsWindowImpl(
               << std::chrono::duration_cast<std::chrono::microseconds>(timeLayerEnd - timeLayerStart).count() / 1000000.0
               << " sec" << "\e[0m" << std::endl;
 
-    // Вместо сброса гигабайтов на диск — редуцируем момент и квенч прямо в ОЗУ и освобождаем Node
     std::atomic<size_t> nextReduceSlot{minHash};
     std::atomic<size_t> totalTerms{0};
     std::mutex mergeMutex;
@@ -838,9 +838,13 @@ ComputationResult computeNextLayerStatsWindowImpl(
                         if (!cur_node->expr.getPoly().isZero()) {
                             localCount++;
                             const Poly& p = cur_node->expr.getPoly();
-                            localMoment += (p * p);
-                            auto sigCounts = cur_node->expr.getNumSigmas();
-                            localQuenchMap[sigCounts] += p;
+                            if (computeMoment) {
+                                localMoment += (p * p);
+                            }
+                            if (computeQuench) {
+                                auto sigCounts = cur_node->expr.getNumSigmas();
+                                localQuenchMap[sigCounts] += p;
+                            }
                         }
                         delete cur_node;
                         cur_node = next_node;
@@ -851,9 +855,13 @@ ComputationResult computeNextLayerStatsWindowImpl(
 
             totalTerms.fetch_add(localCount, std::memory_order_relaxed);
             std::lock_guard<std::mutex> lock(mergeMutex);
-            windowMoment += localMoment;
-            for (const auto& [sigTriple, polySum] : localQuenchMap) {
-                globalQuenchMap[sigTriple] += polySum;
+            if (computeMoment) {
+                windowMoment += localMoment;
+            }
+            if (computeQuench) {
+                for (const auto& [sigTriple, polySum] : localQuenchMap) {
+                    globalQuenchMap[sigTriple] += polySum;
+                }
             }
         });
     }
@@ -861,14 +869,15 @@ ComputationResult computeNextLayerStatsWindowImpl(
         th.join();
     delete[] indices;
 
-    // Собираем финальный полином квенча окна из сгруппированных троек (nx, ny, nz)
     Poly windowQuench;
-    for (const auto& [sigTriple, polySum] : globalQuenchMap) {
-        if (polySum.isZero())
-            continue;
-        auto [nx, ny, nz] = sigTriple;
-        Poly multiplyBy = Poly("[1," + std::to_string(nx) + "," + std::to_string(ny) + "," + std::to_string(nz) + "]");
-        windowQuench += polySum.prependVariables(3) * multiplyBy;
+    if (computeQuench) {
+        for (const auto& [sigTriple, polySum] : globalQuenchMap) {
+            if (polySum.isZero())
+                continue;
+            auto [nx, ny, nz] = sigTriple;
+            Poly multiplyBy = Poly("[1," + std::to_string(nx) + "," + std::to_string(ny) + "," + std::to_string(nz) + "]");
+            windowQuench += polySum.prependVariables(3) * multiplyBy;
+        }
     }
 
     size_t maxMem = (memoryUsageEnd >= memoryUsageStart) ? (memoryUsageEnd - memoryUsageStart) : 0;
@@ -885,7 +894,8 @@ ComputationResult computeNextLayerStatsWindowImpl(
 ComputationResult computeNextLayerStatsWindow(
     const std::vector<Expression>& H, size_t prevTableSize,
     size_t curLevelNum, size_t curTableSize,
-    size_t minHash, size_t maxHash, const std::string& chkPath)
+    size_t minHash, size_t maxHash, const std::string& chkPath,
+    bool computeMoment, bool computeQuench)
 {
     int pipefd[2];
     if (pipe(pipefd) != 0) std::abort();
@@ -894,7 +904,7 @@ ComputationResult computeNextLayerStatsWindow(
     if (fork_res == 0) {
         close(pipefd[0]);
         ComputationResult res = computeNextLayerStatsWindowImpl(
-            H, prevTableSize, curLevelNum, curTableSize, minHash, maxHash, chkPath);
+            H, prevTableSize, curLevelNum, curTableSize, minHash, maxHash, chkPath, computeMoment, computeQuench);
         ssize_t written = 0;
         while (written < static_cast<ssize_t>(sizeof(ComputationResult))) {
             ssize_t w = write(pipefd[1], reinterpret_cast<char*>(&res) + written, sizeof(ComputationResult) - written);
@@ -923,11 +933,11 @@ ComputationResult computeNextLayerStatsWindow(
     }
 }
 
-// Запуск: ./QCommute next-layer-stats <FILE> <RES_DIR> <BASE_LAYER> --memory-limit MB [--layer-meta O_size tableSize expRatio avgBytes]
+// Run: ./QCommute next-layer-stats <FILE> <RES_DIR> <BASE_LAYER> [--stat all|momentum|quench] [--memory-limit MB] [--layer-meta ...]
 int runNextLayerStats(int argc, char** argv) {
     if (argc < 5) {
         std::cerr << "Usage: " << argv[0] << " next-layer-stats [FILE] [RES_DIR] [BASE_LAYER] "
-                  << "[--memory-limit MB] [--layer-meta O_size tableSize expRatio avgBytes]" << std::endl;
+                  << "[--stat all|momentum|quench] [--memory-limit MB] [--layer-meta O_size tableSize expRatio avgBytes]" << std::endl;
         return 1;
     }
     std::string inputFile = argv[2];
@@ -936,10 +946,28 @@ int runNextLayerStats(int argc, char** argv) {
     size_t targetLayer = baseLayer + 1;
     config.memoryLimitInBytes = std::numeric_limits<size_t>::max();
     config.hasExplicitMeta = false;
+    bool computeMoment = true;
+    bool computeQuench = true;
 
     for (int i = 5; i < argc;) {
         if (std::string(argv[i]) == "--memory-limit") {
             config.memoryLimitInBytes = std::stoull(argv[i + 1]) * 1'048'576;
+            i += 2;
+        } else if (std::string(argv[i]) == "--stat") {
+            std::string mode = argv[i + 1];
+            if (mode == "all") {
+                computeMoment = true;
+                computeQuench = true;
+            } else if (mode == "momentum" || mode == "moment") {
+                computeMoment = true;
+                computeQuench = false;
+            } else if (mode == "quench") {
+                computeMoment = false;
+                computeQuench = true;
+            } else {
+                std::cerr << "Unknown --stat mode: " << mode << " (expected: all, momentum, or quench)" << std::endl;
+                return 1;
+            }
             i += 2;
         } else if (std::string(argv[i]) == "--layer-meta") {
             config.hasExplicitMeta = true;
@@ -989,11 +1017,9 @@ int runNextLayerStats(int argc, char** argv) {
     std::string statsDir = config.directoryPath + "/stats_layer_" + std::to_string(targetLayer);
     std::filesystem::create_directories(statsDir);
 
-    std::cerr << "[next-layer-stats] Computing in-memory stats for Layer " << targetLayer
+    std::cerr << "[next-layer-stats] Computing in-memory stats (moment=" << computeMoment
+              << ", quench=" << computeQuench << ") for Layer " << targetLayer
               << " from Layer " << baseLayer << std::endl;
-    std::cerr << "[DIAG] layer=" << targetLayer << " base_O_size=" << O_size
-              << " prevTableSize=" << prevTableSize << " targetTableSize=" << tableSize
-              << " avgBytesPerHash=" << averageBytesPerHash << std::endl;
 
     auto safeSubtract = [](size_t x, size_t y) { return (x >= y) ? (x - y) : 0; };
     size_t memoryUsagePerOldExpression = safeSubtract(averageBytesPerHash, (sizeof(Node) - sizeof(Expression)) + sizeof(std::mutex) / 16);
@@ -1016,8 +1042,8 @@ int runNextLayerStats(int argc, char** argv) {
             cur_O_size += chkOSize;
             sumOfMemoryUsages += chkMem;
             averageBytesPerHash = std::max((double)sumOfMemoryUsages / (i + numHashes), (double)(sizeof(Node) + sizeof(Node*)));
-            totalMoment += Poly2(winMoment);
-            totalQuench += Poly2(winQuench);
+            if (computeMoment) totalMoment += Poly2(winMoment);
+            if (computeQuench) totalQuench += Poly2(winQuench);
             std::cerr << "[CHECKPOINT] Loaded window=" << windowIndex << " slots=[" << chkMin << ", " << chkMax
                       << ") O_size_so_far=" << cur_O_size << std::endl;
             i = chkMax;
@@ -1033,12 +1059,12 @@ int runNextLayerStats(int argc, char** argv) {
                   << " maxNumHashes=" << maxNumHashes << std::endl;
 
         ComputationResult res = computeNextLayerStatsWindow(
-            H, prevTableSize, targetLayer, tableSize, i, i + numHashes, chkPath);
+            H, prevTableSize, targetLayer, tableSize, i, i + numHashes, chkPath, computeMoment, computeQuench);
 
         bool ok = loadWindowStatsCheckpoint(chkPath, chkMin, chkMax, chkOSize, chkMem, winMoment, winQuench);
         assert(ok);
-        totalMoment += Poly2(winMoment);
-        totalQuench += Poly2(winQuench);
+        if (computeMoment) totalMoment += Poly2(winMoment);
+        if (computeQuench) totalQuench += Poly2(winQuench);
 
         cur_O_size += res.O_size;
         sumOfMemoryUsages += res.maxMemoryUsed;
@@ -1058,25 +1084,27 @@ int runNextLayerStats(int argc, char** argv) {
               << " sec; total unique terms: " << cur_O_size << std::endl;
 
     std::cout << "(* Layer " << targetLayer << " total terms: " << cur_O_size << " *)" << std::endl;
-    std::cout << "moment_" << targetLayer << " = ";
-    totalMoment.printAsMathematica(0, [](size_t ind) {
-        return "h" + std::to_string(ind);
-    });
-    std::cout << ";" << std::endl << std::endl;
-
-    std::cout << "quenchCoef_" << targetLayer << " = ";
-    totalQuench.printAsMathematica(3, [](size_t ind) {
-        if (ind < 3)
-            return "p" + std::string(1, 'x' + ind);
-        return "h" + std::to_string(ind - 3);
-    });
-    std::cout << ";" << std::endl;
+    if (computeMoment) {
+        std::cout << "moment_" << targetLayer << " = ";
+        if (totalMoment == Poly2()) std::cout << "0";
+        else totalMoment.printAsMathematica(0, [](size_t ind) { return "h" + std::to_string(ind); });
+        std::cout << ";" << std::endl << std::endl;
+    }
+    if (computeQuench) {
+        std::cout << "quenchCoef_" << targetLayer << " = ";
+        if (totalQuench == Poly2()) std::cout << "0";
+        else totalQuench.printAsMathematica(3, [](size_t ind) {
+            if (ind < 3) return "p" + std::string(1, 'x' + ind);
+            return "h" + std::to_string(ind - 3);
+        });
+        std::cout << ";" << std::endl;
+    }
 
     return 0;
 }
 
 // ============================================================================
-// 3. Подкоманда quench-z: алгоритм досчета m шагов для z-поляризации
+// 3. The quench-z subcommand: an algorithm for computing an additional m steps for z-polarization
 // ============================================================================
 inline bool passesXYFilter(const Expression& expr, size_t maxXY) {
     auto [nx, ny, nz] = expr.getNumSigmas();
@@ -1257,10 +1285,19 @@ ComputationResult computeFilteredLayerWindow(
     }
 }
 
-std::pair<Poly2, size_t> extractZQuenchAndCountB0(const std::string& layerDir, size_t maxXY_for_B0, size_t& outMaxStart) {
+struct QuenchScanStats {
+    Poly2 zQuench;
+    size_t countIn = 0;       // Number of terms with nx, ny <= maxXY_in
+    size_t countNextCore = 0; // The number of terms that already satisfy nx, ny <= maxXY_next
+    size_t maxStart = 0;
+};
+
+QuenchScanStats extractZQuenchAndCountB0(const std::string& layerDir,
+                                         size_t maxXY_in, size_t maxXY_next) {
     auto it = std::filesystem::recursive_directory_iterator(layerDir);
     Poly2 res;
     std::atomic<size_t> b0Count{0};
+    std::atomic<size_t> nextCoreCount{0};
     std::atomic<size_t> maxStartAtom{0};
     std::mutex taskMutex, resMutex;
     size_t num_threads = std::thread::hardware_concurrency();
@@ -1270,6 +1307,7 @@ std::pair<Poly2, size_t> extractZQuenchAndCountB0(const std::string& layerDir, s
         threads.emplace_back([&]() {
             std::map<size_t, Poly> localZMap;
             size_t localB0 = 0;
+            size_t localNextCore = 0;
             size_t localMaxStart = 0;
             while (true) {
                 std::unique_lock<std::mutex> lock(taskMutex);
@@ -1289,8 +1327,11 @@ std::pair<Poly2, size_t> extractZQuenchAndCountB0(const std::string& layerDir, s
                 std::vector<Expression> expressions = loadAndDeleteBlock(filepath);
                 for (const Expression& expr : expressions) {
                     auto [nx, ny, nz] = expr.getNumSigmas();
-                    if (nx <= maxXY_for_B0 && ny <= maxXY_for_B0)
+                    if (nx <= maxXY_in && ny <= maxXY_in) {
                         localB0++;
+                        if (nx <= maxXY_next && ny <= maxXY_next)
+                            localNextCore++;
+                    }
                     if (nx == 0 && ny == 0) {
                         localZMap[nz] += expr.getPoly();
                     }
@@ -1304,6 +1345,7 @@ std::pair<Poly2, size_t> extractZQuenchAndCountB0(const std::string& layerDir, s
                 }
             }
             b0Count.fetch_add(localB0, std::memory_order_relaxed);
+            nextCoreCount.fetch_add(localNextCore, std::memory_order_relaxed);
             size_t curMax = maxStartAtom.load();
             while (localMaxStart > curMax && !maxStartAtom.compare_exchange_weak(curMax, localMaxStart)) {}
             std::lock_guard<std::mutex> lock2(resMutex);
@@ -1311,13 +1353,13 @@ std::pair<Poly2, size_t> extractZQuenchAndCountB0(const std::string& layerDir, s
         });
     }
     for (auto& th : threads) th.join();
-    outMaxStart = maxStartAtom.load();
-    return {res, b0Count.load()};
+    return {res, b0Count.load(), nextCoreCount.load(), maxStartAtom.load()};
 }
 
 int runQuenchZExtension(int argc, char** argv) {
     if (argc < 6) {
-        std::cerr << "Usage: " << argv[0] << " quench-z [FILE] [RES_DIR] [N_MAX] [M] [--memory-limit MB] [--keep-temp]" << std::endl;
+        std::cerr << "Usage: " << argv[0] << " quench-z [FILE] [RES_DIR] [N_MAX] [M] "
+                  << "[--memory-limit MB] [--exp-ratio R] [--keep-temp]" << std::endl;
         return 1;
     }
     std::string inputFile = argv[2];
@@ -1326,10 +1368,14 @@ int runQuenchZExtension(int argc, char** argv) {
     size_t m = std::stoull(argv[5]);
     config.memoryLimitInBytes = std::numeric_limits<size_t>::max();
     bool keepTemp = false;
+    double userExpRatio = 0.0;
 
     for (int i = 6; i < argc;) {
         if (std::string(argv[i]) == "--memory-limit") {
             config.memoryLimitInBytes = std::stoull(argv[i + 1]) * 1'048'576;
+            i += 2;
+        } else if (std::string(argv[i]) == "--exp-ratio") {
+            userExpRatio = std::stod(argv[i + 1]);
             i += 2;
         } else if (std::string(argv[i]) == "--keep-temp") {
             keepTemp = true;
@@ -1352,28 +1398,45 @@ int runQuenchZExtension(int argc, char** argv) {
     }
     file.close();
 
-    std::string baseLayerDir = config.directoryPath + "/" + std::to_string(n_max);
-    std::cerr << "Scanning layer n_max=" << n_max << " for B_0 = >L^" << n_max << " A<_" << m << " ..." << std::endl;
-    size_t maxStart = 0;
-    auto [quenchNMax, b0_size] = extractZQuenchAndCountB0(baseLayerDir, m, maxStart);
-    size_t prevTableSize = maxStart + BLOCK_SIZE;
-    size_t O_size = b0_size;
+    // Determine the base growth multiplier for the model's full layer (1D / 2D / 3D)
+    LayerMeta meta;
+    double modelExpRatio = (userExpRatio > 0.0) ? userExpRatio :
+                           (loadLayerMeta(n_max, meta) && meta.expansionRatio > 1.0) ? meta.expansionRatio :
+                           std::max(1.8, 0.95 * static_cast<double>(H.size()));
 
-    std::cerr << "B_0 size (terms with nx, ny <= " << m << "): " << O_size
+    std::string baseLayerDir = config.directoryPath + "/" + std::to_string(n_max);
+    std::cerr << "Scanning layer n_max=" << n_max << " for B_0 = >L^" << n_max << " A<_" << m
+              << " (modelExpRatio=" << modelExpRatio << ") ..." << std::endl;
+
+    size_t firstOutFilter = (m >= 1) ? (m - 1) : 0;
+    QuenchScanStats scan0 = extractZQuenchAndCountB0(baseLayerDir, m, firstOutFilter);
+    size_t prevTableSize = scan0.maxStart + BLOCK_SIZE;
+    size_t O_size = scan0.countIn;
+    size_t nextCoreCount = scan0.countNextCore;
+
+    std::cerr << "B_0 size (nx, ny <= " << m << "): " << O_size
+              << ", core for next filter (nx, ny <= " << firstOutFilter << "): " << nextCoreCount
               << " (prevTableSize=" << prevTableSize << ")" << std::endl;
+
+    auto printQuenchPoly = [](const Poly2& p) {
+        if (p == Poly2()) {
+            std::cout << "0";
+        } else {
+            p.printAsMathematica(1, [](size_t ind) {
+                if (ind == 0) return std::string("pz");
+                return "h" + std::to_string(ind - 1);
+            });
+        }
+    };
 
     std::cout << "quenchZCoef = {" << std::endl;
     std::cout << "(* Step " << n_max << " *)" << std::endl;
-    quenchNMax.printAsMathematica(1, [](size_t ind) {
-        if (ind == 0) return std::string("pz");
-        return "h" + std::to_string(ind - 1);
-    });
+    printQuenchPoly(scan0.zQuench);
 
     std::string workRoot = config.directoryPath + "/quench_z_from_" + std::to_string(n_max) + "_m" + std::to_string(m);
     std::filesystem::create_directories(workRoot);
 
-    double prevExpansionRatio = 2.90;
-    double averageBytesPerHash = 375.0;
+    double averageBytesPerHash = 380.0;
     std::string prevDir = baseLayerDir;
 
     for (size_t k = 1; k <= m; ++k) {
@@ -1384,10 +1447,17 @@ int runQuenchZExtension(int argc, char** argv) {
             std::filesystem::remove_all(curDir);
         std::filesystem::create_directories(curDir);
 
-        size_t tableSize = std::max<size_t>(BLOCK_SIZE, static_cast<size_t>(std::ceil(prevExpansionRatio * std::max<size_t>(1, O_size))));
+        //  Universal estimate of the size $B_k$ via the measured core count (nextCoreCount)
+        size_t baseForPrediction = (nextCoreCount > 0) ? nextCoreCount : std::max<size_t>(1, O_size / 8);
+        size_t tableSize = std::max<size_t>(
+            BLOCK_SIZE,
+            static_cast<size_t>(std::ceil(modelExpRatio * static_cast<double>(baseForPrediction)))
+        );
+
         std::cerr << "\n\e[32m[quench-z] Step k=" << k << "/" << m
                   << " (Layer " << n_max + k << ", filter >...<_" << maxXY_out << ")\e[0m"
                   << " input_B_" << k - 1 << "_size=" << O_size
+                  << " core_size=" << nextCoreCount
                   << " tableSize=" << tableSize << std::endl;
 
         auto safeSubtract = [](size_t x, size_t y) { return (x >= y) ? (x - y) : 0; };
@@ -1405,29 +1475,27 @@ int runQuenchZExtension(int argc, char** argv) {
 
             cur_O_size += res.O_size;
             sumOfMemoryUsages += res.maxMemoryUsed;
-            if (res.maxMemoryUsed > 0)
-                averageBytesPerHash = std::max((double)sumOfMemoryUsages / (i + numHashes), (double)(sizeof(Node) + sizeof(Node*)));
+            if (res.maxMemoryUsed > 0 && cur_O_size > 0) {
+                // Divide the actual memory by the number of elements (so that sparse tables do not lead to an underestimate)
+                averageBytesPerHash = std::clamp((double)sumOfMemoryUsages / cur_O_size, 320.0, 600.0);
+            }
             i += numHashes;
         }
 
-        size_t dummyMaxStart = 0;
-        auto [quenchCur, nextCount] = extractZQuenchAndCountB0(curDir, maxXY_out, dummyMaxStart);
+        size_t nextOutFilter = (m > k) ? (m - k - 1) : 0;
+        QuenchScanStats scanCur = extractZQuenchAndCountB0(curDir, maxXY_out, nextOutFilter);
 
         std::cout << "," << std::endl;
         std::cout << "(* Step " << n_max + k << " *)" << std::endl;
-        quenchCur.printAsMathematica(1, [](size_t ind) {
-            if (ind == 0) return std::string("pz");
-            return "h" + std::to_string(ind - 1);
-        });
+        printQuenchPoly(scanCur.zQuench);
         std::cout.flush();
 
         if (!keepTemp && k >= 2) {
             std::filesystem::remove_all(prevDir);
         }
 
-        if (O_size > 0 && cur_O_size > 0)
-            prevExpansionRatio = std::clamp((double)cur_O_size / O_size, 1.2, 3.0);
         O_size = cur_O_size;
+        nextCoreCount = scanCur.countNextCore;
         prevTableSize = tableSize;
         prevDir = curDir;
     }
