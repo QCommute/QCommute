@@ -164,11 +164,10 @@ from a previous log directly via `--layer-meta <O_size> <tableSize> <expRatio> <
 ### Computing $(n+1)$-th layer statistics without disk storage (`next-layer-stats`)
 
 When layer $n+1$ is too large to store on disk (e.g. requiring >20 TB), you can
-compute its exact moment and quench polynomials directly in RAM window-by-window:
+compute its exact moment and/or quench polynomials (--stat all | momentum | quench) directly in RAM window-by-window:
 
 ```sh
-./build-release/main next-layer-stats examples/Comm.txt ./results 24 \
-    --memory-limit 950000 > stats_layer25.txt
+./build-release/main next-layer-stats examples/Comm.txt ./results 24 \ --stat all --memory-limit 950000 > stats_layer25.txt
 
 ```
 
