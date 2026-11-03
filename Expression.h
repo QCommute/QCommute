@@ -17,7 +17,40 @@
  * and its sign encodes whether the Levi-Civita symbol is +1 or -1.
  */
 int LeviChivita(int i, int j);
+/**
+ * @brief Lazy evaluator for the commutator polynomial coefficient (+/- 2 * O1.poly * O2.poly).
+ *
+ * Delays expensive GMP polynomial multiplication until at least one generated
+ * Pauli string passes the hash-window or polarization filter.
+ */
+class LazyCommutatorPoly {
+private:
+    const Poly* p1_;
+    const Poly* p2_;
+    mutable Poly posPoly_;
+    mutable Poly negPoly_;
+    mutable bool posComputed_ = false;
+    mutable bool negComputed_ = false;
 
+public:
+    LazyCommutatorPoly(const Poly& p1, const Poly& p2) : p1_(&p1), p2_(&p2) {}
+
+    /** @brief Return +2*p1*p2 (if negative == false) or -2*p1*p2 (if negative == true). */
+    const Poly& get(bool negative) const {
+        if (!posComputed_) {
+            posPoly_ = (*p1_) * (*p2_);
+            posPoly_ *= 2;
+            posComputed_ = true;
+        }
+        if (!negative)
+            return posPoly_;
+        if (!negComputed_) {
+            negPoly_ = posPoly_ * (-1);
+            negComputed_ = true;
+        }
+        return negPoly_;
+    }
+};
 /**
  * @brief A single term in a sum-of-Pauli-strings operator.
  *
@@ -44,8 +77,7 @@ class Expression {
     friend struct ExpressionHasher;
 
     template<size_t D>
-    friend void commuteImpl(const Expression& O1, const Expression& O2,
-                            std::function<void(Expression&& newExpression)> callback);
+    friend void commuteImpl(const Expression& O1, const Expression& O2, std::function<void(Expression&& newExpression, const LazyCommutatorPoly& lazyPoly, bool isNegative)> callback);
 private:
     Poly poly;                  ///< Polynomial coefficient (exact, arbitrary precision).
     std::vector<int> sigmaCoords; ///< Packed site coordinates in canonical order.
@@ -60,6 +92,7 @@ private:
     void setSigmas3D(const Sigma<3>* sigmas, size_t sigmasSize);
 
     template<size_t D>
+    void setSigmasFromPointSorted(const Sigma<D>* sigmas, size_t sigmasSize);
     std::vector<Sigma<D>> getList() const;
 
 public:
@@ -107,7 +140,17 @@ public:
      */
     void Commute(const Expression& O,
                  std::function<void(Expression&& newExpression)> callback) const;
-
+    /**
+     * @brief Compute the commutator [*this, O] with lazy polynomial evaluation.
+     *
+     * The callback receives the structural Expression (with an empty Poly),
+     * a LazyCommutatorPoly reference, and the sign flag `isNegative`. This avoids
+     * multiplying or copying GMP polynomials for terms rejected by window filters.
+     */
+    void Commute(const Expression& O,
+                 std::function<void(Expression&& newExpression,
+                                    const LazyCommutatorPoly& lazyPoly,
+                                    bool isNegative)> callback) const;
     /**
      * @brief Test structural equality (same Pauli string, ignoring coefficient).
      *
