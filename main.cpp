@@ -315,17 +315,23 @@ ComputationResult computePartOfNextLayerImpl(const std::vector<Expression>& H, s
 
                 for (size_t i = 0; i < H.size(); i++)
                     for (size_t j = 0; j < expressionsCur.size(); j++)
-                        H[i].Commute(expressionsCur[j], [&](Expression&& newExpression) {
+                        H[i].Commute(expressionsCur[j], [&](Expression&& newExpression,
+                                    const LazyCommutatorPoly& lazyPoly,
+                                    bool isNegative) {
                             size_t hash = ExpressionHasher()(newExpression);
-                            if (hash % curTableSize < minHash || hash % curTableSize >= maxHash)
+                            size_t slot = hash % curTableSize;
+                            if (slot < minHash || slot >= maxHash)
                                 return;
-                            std::lock_guard<std::mutex> guard(indexMutexes[(hash % curTableSize - minHash) / 16]);
+                            // Evaluate polynomial product lazily only when the term lands in the current window
+                            const Poly& termPoly = lazyPoly.get(isNegative);
+                            size_t localSlot = slot - minHash;
+                            std::lock_guard<std::mutex> guard(indexMutexes[localSlot / 16]);
                             Node* prev_node = nullptr;
-                            Node* cur_node = indices[hash % curTableSize - minHash];
+                            Node* cur_node = indices[localSlot];
                             bool found = false;
                             while (cur_node != nullptr) {
                                 if (cur_node->expr == newExpression) {
-                                    cur_node->expr.getPoly() += newExpression.getPoly();
+                                    cur_node->expr.getPoly() += termPoly;
                                     found = true;
                                     break;
                                 } else if (newExpression < cur_node->expr)
@@ -334,9 +340,9 @@ ComputationResult computePartOfNextLayerImpl(const std::vector<Expression>& H, s
                                 cur_node = cur_node->next;
                             }
                             if (!found) {
+                                newExpression.getPoly() = termPoly; // Copy Poly only when allocating a new unique Node
                                 if (prev_node == nullptr)
-                                    indices[hash % curTableSize - minHash] =
-                                        new Node(std::move(newExpression), indices[hash % curTableSize - minHash]);
+                                    indices[localSlot] = new Node(std::move(newExpression), indices[localSlot]);
                                 else
                                     prev_node->next = new Node(std::move(newExpression), cur_node);
                             }
@@ -596,12 +602,19 @@ int runRecoverLayer(const std::string& inputFile, const std::string& resDir,
 
                 for (size_t i = 0; i < H.size(); ++i) {
                     for (size_t j = 0; j < expressionsCur.size(); ++j) {
-                        H[i].Commute(expressionsCur[j], [&](Expression&& newExpression) {
+
+
+                        // --- Inside runRecoverLayer ---
+                        H[i].Commute(expressionsCur[j], [&](Expression&& newExpression,
+                                    const LazyCommutatorPoly& lazyPoly,
+                                    bool isNegative) {
                             size_t slot = ExpressionHasher()(newExpression) % curTableSize;
                             size_t b = slot / BLOCK_SIZE;
                             int64_t compactBlock = blockToCompactIdx[b];
                             if (compactBlock < 0)
-                                return;
+                                return; // Block already exists on disk; skip before any GMP poly multiplication
+
+                            const Poly& termPoly = lazyPoly.get(isNegative);
 
                             size_t compactSlot = static_cast<size_t>(compactBlock) * BLOCK_SIZE + (slot % BLOCK_SIZE);
                             std::lock_guard<std::mutex> guard(indexMutexes[compactSlot / 16]);
@@ -610,7 +623,7 @@ int runRecoverLayer(const std::string& inputFile, const std::string& resDir,
                             bool found = false;
                             while (cur_node != nullptr) {
                                 if (cur_node->expr == newExpression) {
-                                    cur_node->expr.getPoly() += newExpression.getPoly();
+                                    cur_node->expr.getPoly() += termPoly;
                                     found = true;
                                     break;
                                 } else if (newExpression < cur_node->expr) {
@@ -620,12 +633,13 @@ int runRecoverLayer(const std::string& inputFile, const std::string& resDir,
                                 cur_node = cur_node->next;
                             }
                             if (!found) {
+                                newExpression.getPoly() = termPoly;
                                 if (prev_node == nullptr)
                                     indices[compactSlot] = new Node(std::move(newExpression), indices[compactSlot]);
                                 else
                                     prev_node->next = new Node(std::move(newExpression), cur_node);
                             }
-                        });
+                        });      
                     }
                 }
 
@@ -770,11 +784,15 @@ ComputationResult computeNextLayerStatsWindowImpl(
 
                 for (size_t i = 0; i < H.size(); i++) {
                     for (size_t j = 0; j < expressionsCur.size(); j++) {
-                        H[i].Commute(expressionsCur[j], [&](Expression&& newExpression) {
+                        H[i].Commute(expressionsCur[j], [&](Expression&& newExpression,
+                                    const LazyCommutatorPoly& lazyPoly,
+                                    bool isNegative) {
                             size_t hash = ExpressionHasher()(newExpression);
                             size_t slot = hash % curTableSize;
                             if (slot < minHash || slot >= maxHash)
                                 return;
+                            // Evaluate polynomial product lazily only when the term lands in the current window
+                            const Poly& termPoly = lazyPoly.get(isNegative);
                             size_t localSlot = slot - minHash;
                             std::lock_guard<std::mutex> guard(indexMutexes[localSlot / 16]);
                             Node* prev_node = nullptr;
@@ -782,7 +800,7 @@ ComputationResult computeNextLayerStatsWindowImpl(
                             bool found = false;
                             while (cur_node != nullptr) {
                                 if (cur_node->expr == newExpression) {
-                                    cur_node->expr.getPoly() += newExpression.getPoly();
+                                    cur_node->expr.getPoly() += termPoly;
                                     found = true;
                                     break;
                                 } else if (newExpression < cur_node->expr)
@@ -791,6 +809,7 @@ ComputationResult computeNextLayerStatsWindowImpl(
                                 cur_node = cur_node->next;
                             }
                             if (!found) {
+                                newExpression.getPoly() = termPoly; // Copy Poly only when allocating a new unique Node
                                 if (prev_node == nullptr)
                                     indices[localSlot] = new Node(std::move(newExpression), indices[localSlot]);
                                 else
@@ -1028,8 +1047,8 @@ int runNextLayerStats(int argc, char** argv) {
     size_t cur_O_size = 0;
     size_t sumOfMemoryUsages = 0;
     size_t windowIndex = 0;
-    Poly2 totalMoment;
-    Poly2 totalQuench;
+    Poly totalMoment;
+    Poly totalQuench;
 
     auto timeLayerStart = Clock::now();
     for (size_t i = 0; i < tableSize;) {
@@ -1042,8 +1061,8 @@ int runNextLayerStats(int argc, char** argv) {
             cur_O_size += chkOSize;
             sumOfMemoryUsages += chkMem;
             averageBytesPerHash = std::max((double)sumOfMemoryUsages / (i + numHashes), (double)(sizeof(Node) + sizeof(Node*)));
-            if (computeMoment) totalMoment += Poly2(winMoment);
-            if (computeQuench) totalQuench += Poly2(winQuench);
+            if (computeMoment) totalMoment += winMoment;
+            if (computeQuench) totalQuench += winQuench;
             std::cerr << "[CHECKPOINT] Loaded window=" << windowIndex << " slots=[" << chkMin << ", " << chkMax
                       << ") O_size_so_far=" << cur_O_size << std::endl;
             i = chkMax;
@@ -1086,17 +1105,23 @@ int runNextLayerStats(int argc, char** argv) {
     std::cout << "(* Layer " << targetLayer << " total terms: " << cur_O_size << " *)" << std::endl;
     if (computeMoment) {
         std::cout << "moment_" << targetLayer << " = ";
-        if (totalMoment == Poly2()) std::cout << "0";
-        else totalMoment.printAsMathematica(0, [](size_t ind) { return "h" + std::to_string(ind); });
+        if (totalMoment.isZero()) {
+            std::cout << "0";
+        } else {
+            Poly2(totalMoment).printAsMathematica(0, [](size_t ind) { return "h" + std::to_string(ind); });
+        }
         std::cout << ";" << std::endl << std::endl;
     }
     if (computeQuench) {
         std::cout << "quenchCoef_" << targetLayer << " = ";
-        if (totalQuench == Poly2()) std::cout << "0";
-        else totalQuench.printAsMathematica(3, [](size_t ind) {
-            if (ind < 3) return "p" + std::string(1, 'x' + ind);
-            return "h" + std::to_string(ind - 3);
-        });
+        if (totalQuench.isZero()) {
+            std::cout << "0";
+        } else {
+            Poly2(totalQuench).printAsMathematica(3, [](size_t ind) {
+                if (ind < 3) return "p" + std::string(1, 'x' + ind);
+                return "h" + std::to_string(ind - 3);
+            });
+        }
         std::cout << ";" << std::endl;
     }
 
@@ -1157,15 +1182,17 @@ ComputationResult computeFilteredLayerWindowImpl(
                         continue;
 
                     for (size_t i = 0; i < H.size(); i++) {
-                        H[i].Commute(expressionsCur[j], [&](Expression&& newExpression) {
+                        H[i].Commute(expressionsCur[j], [&](Expression&& newExpression,
+                                    const LazyCommutatorPoly& lazyPoly,
+                                    bool isNegative) {
                             if (!passesXYFilter(newExpression, maxXY_out))
                                 return;
-
                             size_t hash = ExpressionHasher()(newExpression);
                             size_t slot = hash % curTableSize;
                             if (slot < minHash || slot >= maxHash)
                                 return;
-
+                            // Evaluate polynomial product lazily only when the term lands in the current window
+                            const Poly& termPoly = lazyPoly.get(isNegative);
                             size_t localSlot = slot - minHash;
                             std::lock_guard<std::mutex> guard(indexMutexes[localSlot / 16]);
                             Node* prev_node = nullptr;
@@ -1173,7 +1200,7 @@ ComputationResult computeFilteredLayerWindowImpl(
                             bool found = false;
                             while (cur_node != nullptr) {
                                 if (cur_node->expr == newExpression) {
-                                    cur_node->expr.getPoly() += newExpression.getPoly();
+                                    cur_node->expr.getPoly() += termPoly;
                                     found = true;
                                     break;
                                 } else if (newExpression < cur_node->expr)
@@ -1182,6 +1209,7 @@ ComputationResult computeFilteredLayerWindowImpl(
                                 cur_node = cur_node->next;
                             }
                             if (!found) {
+                                newExpression.getPoly() = termPoly; // Copy Poly only when allocating a new unique Node
                                 if (prev_node == nullptr)
                                     indices[localSlot] = new Node(std::move(newExpression), indices[localSlot]);
                                 else
@@ -1287,15 +1315,16 @@ ComputationResult computeFilteredLayerWindow(
 
 struct QuenchScanStats {
     Poly2 zQuench;
+    bool isZQuenchZero = true;
     size_t countIn = 0;       // Number of terms with nx, ny <= maxXY_in
-    size_t countNextCore = 0; // The number of terms that already satisfy nx, ny <= maxXY_next
+    size_t countNextCore = 0; // Number of terms already satisfying nx, ny <= maxXY_next
     size_t maxStart = 0;
 };
 
 QuenchScanStats extractZQuenchAndCountB0(const std::string& layerDir,
                                          size_t maxXY_in, size_t maxXY_next) {
     auto it = std::filesystem::recursive_directory_iterator(layerDir);
-    Poly2 res;
+    std::map<size_t, Poly> globalZMap;
     std::atomic<size_t> b0Count{0};
     std::atomic<size_t> nextCoreCount{0};
     std::atomic<size_t> maxStartAtom{0};
@@ -1337,23 +1366,30 @@ QuenchScanStats extractZQuenchAndCountB0(const std::string& layerDir,
                     }
                 }
             }
-            Poly2 localRes;
-            for (const auto& [nz, pSum] : localZMap) {
-                if (!pSum.isZero()) {
-                    Poly multiplyBy = Poly("[1," + std::to_string(nz) + "]");
-                    localRes += Poly2(pSum.prependVariables(1) * multiplyBy);
-                }
-            }
             b0Count.fetch_add(localB0, std::memory_order_relaxed);
             nextCoreCount.fetch_add(localNextCore, std::memory_order_relaxed);
             size_t curMax = maxStartAtom.load();
             while (localMaxStart > curMax && !maxStartAtom.compare_exchange_weak(curMax, localMaxStart)) {}
+
             std::lock_guard<std::mutex> lock2(resMutex);
-            res += localRes;
+            for (const auto& [nz, pSum] : localZMap) {
+                globalZMap[nz] += pSum;
+            }
         });
     }
     for (auto& th : threads) th.join();
-    return {res, b0Count.load(), nextCoreCount.load(), maxStartAtom.load()};
+
+    Poly2 res;
+    bool isZero = true;
+    for (const auto& [nz, pSum] : globalZMap) {
+        if (!pSum.isZero()) {
+            isZero = false;
+            Poly multiplyBy = Poly("[1," + std::to_string(nz) + "]");
+            res += Poly2(pSum.prependVariables(1) * multiplyBy);
+        }
+    }
+
+    return {res, isZero, b0Count.load(), nextCoreCount.load(), maxStartAtom.load()};
 }
 
 int runQuenchZExtension(int argc, char** argv) {
@@ -1418,11 +1454,11 @@ int runQuenchZExtension(int argc, char** argv) {
               << ", core for next filter (nx, ny <= " << firstOutFilter << "): " << nextCoreCount
               << " (prevTableSize=" << prevTableSize << ")" << std::endl;
 
-    auto printQuenchPoly = [](const Poly2& p) {
-        if (p == Poly2()) {
+    auto printQuenchPoly = [](const QuenchScanStats& st) {
+        if (st.isZQuenchZero) {
             std::cout << "0";
         } else {
-            p.printAsMathematica(1, [](size_t ind) {
+            st.zQuench.printAsMathematica(1, [](size_t ind) {
                 if (ind == 0) return std::string("pz");
                 return "h" + std::to_string(ind - 1);
             });
@@ -1431,7 +1467,7 @@ int runQuenchZExtension(int argc, char** argv) {
 
     std::cout << "quenchZCoef = {" << std::endl;
     std::cout << "(* Step " << n_max << " *)" << std::endl;
-    printQuenchPoly(scan0.zQuench);
+    printQuenchPoly(scan0);
 
     std::string workRoot = config.directoryPath + "/quench_z_from_" + std::to_string(n_max) + "_m" + std::to_string(m);
     std::filesystem::create_directories(workRoot);
@@ -1487,7 +1523,7 @@ int runQuenchZExtension(int argc, char** argv) {
 
         std::cout << "," << std::endl;
         std::cout << "(* Step " << n_max + k << " *)" << std::endl;
-        printQuenchPoly(scanCur.zQuench);
+        printQuenchPoly(scanCur);
         std::cout.flush();
 
         if (!keepTemp && k >= 2) {
