@@ -123,14 +123,14 @@ std::vector<uint8_t> loadFile(const std::string& path) {
 }
 
 size_t getLogicalFileSize(const std::string& path) {
-    struct stat stats{};
-    if (stat(path.c_str(), &stats) != 0)
+    struct stat {};
+    if (stat(path.c_str(), &) != 0)
         return 0;
-    return static_cast<size_t>(stats.st_size);
+    return static_cast<size_t>(.st_size);
 }
 
 size_t getRealFileSize(const std::string& path) {
-    struct stat stats{};
+    struct stat {};
     if (stat(path.c_str(), &stats) != 0) {
         std::cerr << "CRITICAL ERROR: stat() failed on: " << path
                   << " (" << std::strerror(errno) << ")" << std::endl;
@@ -1082,8 +1082,8 @@ int runNextLayerStats(int argc, char** argv) {
 
         bool ok = loadWindowStatsCheckpoint(chkPath, chkMin, chkMax, chkOSize, chkMem, winMoment, winQuench);
         assert(ok);
-        if (computeMoment) totalMoment += Poly2(winMoment);
-        if (computeQuench) totalQuench += Poly2(winQuench);
+        if (computeMoment) totalMoment += winMoment;
+        if (computeQuench) totalQuench += winQuench;
 
         cur_O_size += res.O_size;
         sumOfMemoryUsages += res.maxMemoryUsed;
