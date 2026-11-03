@@ -221,13 +221,40 @@ std::tuple<size_t, size_t, size_t> Expression::getNumSigmas() const {
 }
 
 template<size_t D>
-void commuteImpl(const Expression& O1, const Expression& O2,std::function<void(Expression&& newExpression)> callback) {
-    // polynomial arithmetic: multiply the two polynomial coefficients
-    Poly pol1 = O1.poly * O2.poly;
-    pol1 *= 2;
-    Poly m_pol1 = pol1 * (-1);
-    
-    // The main commutation logic starts here; the key part is how the result is recorded at the end (see comment below)
+void Expression::setSigmasFromPointSorted(const Sigma<D>* sigmas, size_t sigmasSize) {
+    numSigmaX = 0;
+    numSigmaY = 0;
+    for (size_t i = 0; i < sigmasSize; i++) {
+        int c = sigmas[i].getC();
+        if (c == 1)
+            numSigmaX++;
+        else if (c == 2)
+            numSigmaY++;
+    }
+
+    sigmaCoords.resize(sigmasSize * D);
+    size_t idxX = 0;
+    size_t idxY = numSigmaX * D;
+    size_t idxZ = (numSigmaX + numSigmaY) * D;
+
+    for (size_t i = 0; i < sigmasSize; i++) {
+        int c = sigmas[i].getC();
+        const Point<D>& pt = sigmas[i].getPoint();
+        size_t& dst = (c == 1) ? idxX : ((c == 2) ? idxY : idxZ);
+        for (size_t d = 0; d < D; d++) {
+            sigmaCoords[dst++] = pt.p[d];
+        }
+    }
+}
+
+template<size_t D>
+void commuteImpl(const Expression& O1, const Expression& O2,
+                 std::function<void(Expression&& newExpression,
+                                    const LazyCommutatorPoly& lazyPoly,
+                                    bool isNegative)> callback) {
+    // Prepare lazy polynomial product (no GMP operations are executed until requested)
+    LazyCommutatorPoly lazyPoly(O1.poly, O2.poly);
+
     std::vector<Sigma<D>> lst = O1.getList<D>();
     std::sort(lst.begin(), lst.end(), [&](const Sigma<D>& s1, const Sigma<D>& s2) {
         return s1.getPoint() < s2.getPoint();
@@ -236,55 +263,57 @@ void commuteImpl(const Expression& O1, const Expression& O2,std::function<void(E
     std::sort(lst1.begin(), lst1.end(), [&](const Sigma<D>& s1, const Sigma<D>& s2) {
         return s1.getPoint() < s2.getPoint();
     });
-    Sigma<D>* lst3 = new Sigma<D>[lst.size() + lst1.size()];
+
+    std::vector<Sigma<D>> lst3(lst.size() + lst1.size());
     for (size_t i = 0; i < lst.size(); i++) {
         for (size_t j = 0; j < lst1.size(); j++) {
             auto s1 = lst[i];
             auto s11 = lst1[j];
 
-            if (s1.getC()==s11.getC()){
+            if (s1.getC() == s11.getC()) {
                 continue;
             }
-            int imm=0;
-            int nc=LeviChivita(s1.getC(),s11.getC());
+            int imm = 0;
+            int nc = LeviChivita(s1.getC(), s11.getC());
             imm++;
-            if (O2.im==true){
+            if (O2.im == true) {
                 imm++;
             }
-            if (O1.im==true){
+            if (O1.im == true) {
                 imm++;
             }
-            if (nc<0){
-                imm+=2;
-                nc=nc*(-1);
+            if (nc < 0) {
+                imm += 2;
+                nc = nc * (-1);
             }
 
-            // build the list of sigmas sorted by lattice point;
+            // Build the list of sigmas sorted by lattice point;
             // sigmas landing on the same point collapse
             Point<D> pd = s11.getPoint() - s1.getPoint();
-            Point<D> deltaLst1 = -Point<D>::elementwiseMin(pd, Point<D>()), deltaLst = Point<D>::elementwiseMax(Point<D>(), pd);
+            Point<D> deltaLst1 = -Point<D>::elementwiseMin(pd, Point<D>());
+            Point<D> deltaLst = Point<D>::elementwiseMax(Point<D>(), pd);
             size_t lst3Size = 0;
             size_t ptr = 0, ptr1 = 0;
             int nn = 0;
-            while(ptr < lst.size() || ptr1 < lst1.size()) {
-                if(ptr1 == j)
+            while (ptr < lst.size() || ptr1 < lst1.size()) {
+                if (ptr1 == j)
                     ptr1++;
                 else {
                     Sigma<D> t;
-                    if(ptr1 < lst1.size() && (ptr == lst.size() || (lst1[ptr1].getPoint() + deltaLst1 < lst[ptr].getPoint() + deltaLst))) {
+                    if (ptr1 < lst1.size() && (ptr == lst.size() || (lst1[ptr1].getPoint() + deltaLst1 < lst[ptr].getPoint() + deltaLst))) {
                         t = lst1[ptr1];
                         t.setPoint(t.getPoint() + deltaLst1);
                         ptr1++;
                     } else {
                         t = lst[ptr];
-                        if (ptr==i)
+                        if (ptr == i)
                             t.setC(nc);
                         t.setPoint(t.getPoint() + deltaLst);
                         ptr++;
                     }
 
-                    if(lst3Size > 0 && lst3[lst3Size - 1].getPoint() == t.getPoint()) {
-                        if(lst3[lst3Size - 1].getC() == t.getC())
+                    if (lst3Size > 0 && lst3[lst3Size - 1].getPoint() == t.getPoint()) {
+                        if (lst3[lst3Size - 1].getC() == t.getC())
                             lst3Size--;
                         else {
                             nn++;
@@ -296,8 +325,9 @@ void commuteImpl(const Expression& O1, const Expression& O2,std::function<void(E
                             }
                             lst3[lst3Size - 1].setC(nc2);
                         }
-                    } else
+                    } else {
                         lst3[lst3Size++] = t;
+                    }
                 }
             }
 
@@ -305,46 +335,56 @@ void commuteImpl(const Expression& O1, const Expression& O2,std::function<void(E
                 continue;
             }
 
-            // shift minimum to point 1
-            if(lst3Size > 0) {
+            // Shift minimum coordinate to point 1 in each dimension
+            if (lst3Size > 0) {
                 Point<D> mp = lst3[0].getPoint();
-                for(size_t k = 1; k < lst3Size; k++)
+                for (size_t k = 1; k < lst3Size; k++)
                     mp = Point<D>::elementwiseMin(mp, lst3[k].getPoint());
 
                 Point<D> delta;
-                for(size_t k = 0; k < D; k++)
+                for (size_t k = 0; k < D; k++)
                     delta.p[k] = (mp.p[k] > 1) ? (-mp.p[k] + 1) : 0;
-                for(size_t k = 0; k < lst3Size; k++)
+                for (size_t k = 0; k < lst3Size; k++)
                     lst3[k].setPoint(lst3[k].getPoint() + delta);
             }
 
-            // create the new expression
+            // Construct only the structural part of Expression (leaving Poly empty)
             imm = imm % 4;
-            if(imm == 2 || imm == 3) {
-                Expression O1(lst3, lst3Size, m_pol1, (imm % 2) == 1);
-                callback(std::move(O1));
-            } else {
-                Expression O1(lst3, lst3Size, pol1, (imm % 2) == 1);
-                callback(std::move(O1));
-            }
+            Expression newExpr;
+            newExpr.im = ((imm % 2) == 1);
+            newExpr.dim = static_cast<int32_t>(D);
+            newExpr.setSigmasFromPointSorted<D>(lst3.data(), lst3Size);
+
+            bool isNegative = (imm == 2 || imm == 3);
+            callback(std::move(newExpr), lazyPoly, isNegative);
         }
     }
-    delete[] lst3;
 }
 
-// the primary operator: commutator of two Pauli string expressions
-void Expression::Commute(const Expression& O, std::function<void(Expression&& newExpression)> callback) const {
-    if(sigmaCoords.empty() || O.sigmaCoords.empty())
+void Expression::Commute(const Expression& O,
+                         std::function<void(Expression&& newExpression,
+                                            const LazyCommutatorPoly& lazyPoly,
+                                            bool isNegative)> callback) const {
+    if (sigmaCoords.empty() || O.sigmaCoords.empty())
         return;
     assert(dim == O.dim);
     assert(dim <= 3);
 
-    if(dim == 1)
-        commuteImpl<1>(*this, O, callback);
-    else if(dim == 2)
-        commuteImpl<2>(*this, O, callback);
+    if (dim == 1)
+        commuteImpl<1>(*this, O, std::move(callback));
+    else if (dim == 2)
+        commuteImpl<2>(*this, O, std::move(callback));
     else
-        commuteImpl<3>(*this, O, callback);
+        commuteImpl<3>(*this, O, std::move(callback));
+}
+
+// Keep the single-argument overload for backward compatibility
+void Expression::Commute(const Expression& O,
+                         std::function<void(Expression&& newExpression)> callback) const {
+    Commute(O, [&](Expression&& newExpr, const LazyCommutatorPoly& lazyPoly, bool isNegative) {
+        newExpr.poly = lazyPoly.get(isNegative);
+        callback(std::move(newExpr));
+    });
 }
 
 bool Expression::operator==(const Expression &ex1) const {
