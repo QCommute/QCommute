@@ -123,14 +123,14 @@ std::vector<uint8_t> loadFile(const std::string& path) {
 }
 
 size_t getLogicalFileSize(const std::string& path) {
-    struct stat {};
-    if (stat(path.c_str(), &) != 0)
+    struct stat stats{};
+    if (stat(path.c_str(), &stats) != 0)
         return 0;
-    return static_cast<size_t>(.st_size);
+    return static_cast<size_t>(stats.st_size);
 }
 
 size_t getRealFileSize(const std::string& path) {
-    struct stat {};
+    struct stat stats{};
     if (stat(path.c_str(), &stats) != 0) {
         std::cerr << "CRITICAL ERROR: stat() failed on: " << path
                   << " (" << std::strerror(errno) << ")" << std::endl;
@@ -138,7 +138,6 @@ size_t getRealFileSize(const std::string& path) {
     }
     return static_cast<size_t>(stats.st_blocks) * 512;
 }
-
 std::pair<size_t, size_t> storeFile(const std::string& path, const std::vector<uint8_t>& data) {
     std::ofstream stream(path, std::ios::binary);
     if (!stream) {
