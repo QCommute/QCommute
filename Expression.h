@@ -93,6 +93,7 @@ private:
 
     template<size_t D>
     void setSigmasFromPointSorted(const Sigma<D>* sigmas, size_t sigmasSize);
+    template<size_t D>
     std::vector<Sigma<D>> getList() const;
 
 public:
